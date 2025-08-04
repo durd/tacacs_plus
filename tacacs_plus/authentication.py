@@ -5,7 +5,8 @@ import six
 from .flags import (
     TAC_PLUS_PRIV_LVL_MIN, TAC_PLUS_AUTHEN_LOGIN, TAC_PLUS_AUTHEN_SVC_LOGIN,
     TAC_PLUS_AUTHEN_STATUS_PASS, TAC_PLUS_AUTHEN_STATUS_FAIL, TAC_PLUS_AUTHEN_STATUS_ERROR,
-    TAC_PLUS_AUTHEN_STATUS_GETPASS, TAC_PLUS_VIRTUAL_PORT, TAC_PLUS_VIRTUAL_REM_ADDR
+    TAC_PLUS_AUTHEN_STATUS_GETPASS, TAC_PLUS_VIRTUAL_PORT, TAC_PLUS_VIRTUAL_REM_ADDR,
+    TAC_PLUS_AUTHEN_STATUS_GETDATA
 )
 
 
@@ -166,11 +167,16 @@ class TACACSAuthenticationReply(object):
         return self.status == TAC_PLUS_AUTHEN_STATUS_GETPASS
 
     @property
+    def getdata(self):
+        return self.status == TAC_PLUS_AUTHEN_STATUS_GETDATA
+
+    @property
     def human_status(self):
         return {
             TAC_PLUS_AUTHEN_STATUS_PASS: 'PASS',
             TAC_PLUS_AUTHEN_STATUS_FAIL: 'FAIL',
             TAC_PLUS_AUTHEN_STATUS_GETPASS: 'GETPASS',
+            TAC_PLUS_AUTHEN_STATUS_GETDATA: 'GETDATA',
             TAC_PLUS_AUTHEN_STATUS_ERROR: 'ERROR'
         }.get(self.status, 'UNKNOWN: %s' % self.status)
 
