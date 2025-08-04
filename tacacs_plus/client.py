@@ -3,6 +3,7 @@ import socket
 import select
 import logging
 import contextlib
+import getpass
 from hashlib import md5
 
 import six
@@ -13,7 +14,7 @@ from .flags import (
     TAC_PLUS_AUTHEN, TAC_PLUS_AUTHEN_TYPE_ASCII, TAC_PLUS_AUTHEN_METH_TACACSPLUS,
     TAC_PLUS_AUTHOR, TAC_PLUS_AUTHOR_STATUS_FAIL, TAC_PLUS_PRIV_LVL_MAX,
     TAC_PLUS_ACCT, TAC_PLUS_VIRTUAL_REM_ADDR, TAC_PLUS_VIRTUAL_PORT,
-    TAC_PLUS_AUTHEN_STATUS_FAIL, TAC_PLUS_CONTINUE_FLAG_ABORT
+    TAC_PLUS_AUTHEN_STATUS_FAIL, TAC_PLUS_REPLY_FLAG_NOECHO, TAC_PLUS_AUTHEN_CHPASS
 )
 from .packet import TACACSPacket, TACACSHeader
 from .authentication import TACACSAuthenticationStart, TACACSAuthenticationContinue, TACACSAuthenticationReply
@@ -153,7 +154,7 @@ class TACACSClient(object):
             )
         raise socket.timeout
 
-    def authenticate(self, username, password, priv_lvl=TAC_PLUS_PRIV_LVL_MIN,
+    def authenticate(self, username, password=None, priv_lvl=TAC_PLUS_PRIV_LVL_MIN,
                      authen_type=TAC_PLUS_AUTHEN_TYPE_ASCII,
                      chap_ppp_id=None, chap_challenge=None,
                      rem_addr=TAC_PLUS_VIRTUAL_REM_ADDR, port=TAC_PLUS_VIRTUAL_PORT):
@@ -177,6 +178,8 @@ class TACACSClient(object):
         if authen_type in (TAC_PLUS_AUTHEN_TYPE_PAP,
                            TAC_PLUS_AUTHEN_TYPE_CHAP):
             self.version_min = TAC_PLUS_MINOR_VER_ONE
+            if not password:
+                password = getpass.getpass('password for %s: ' % username)
 
             if authen_type == TAC_PLUS_AUTHEN_TYPE_PAP:
                 start_data = six.b(password)
@@ -210,6 +213,9 @@ class TACACSClient(object):
                 'recv body <%s>' % reply
             ]))
             if authen_type == TAC_PLUS_AUTHEN_TYPE_ASCII and reply.getpass:
+                if not password:
+                    password = getpass.getpass('password for %s: ' % username)
+
                 packet = self.send(TACACSAuthenticationContinue(password),
                                    TAC_PLUS_AUTHEN,
                                    packet.seq_no + 1)
@@ -219,8 +225,17 @@ class TACACSClient(object):
                     'recv header <%s>' % packet.header,
                     'recv body <%s>' % reply
                 ]))
-                if reply.flags == TAC_PLUS_CONTINUE_FLAG_ABORT:
-                    reply.status = TAC_PLUS_AUTHEN_STATUS_FAIL
+            while reply.getdata:
+                data = getpass.getpass(reply.server_msg.decode('ascii'))
+                packet = self.send(TACACSAuthenticationContinue(data),
+                                    TAC_PLUS_AUTHEN,
+                                    packet.seq_no + 1)
+                reply = TACACSAuthenticationReply.unpacked(packet.body)
+                logger.debug('\n'.join([
+                    reply.__class__.__name__,
+                    'recv header <%s>' % packet.header,
+                    'recv body <%s>' % reply
+                ]))
 
         return reply
 
