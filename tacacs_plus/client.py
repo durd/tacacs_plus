@@ -14,7 +14,7 @@ from .flags import (
     TAC_PLUS_AUTHEN, TAC_PLUS_AUTHEN_TYPE_ASCII, TAC_PLUS_AUTHEN_METH_TACACSPLUS,
     TAC_PLUS_AUTHOR, TAC_PLUS_AUTHOR_STATUS_FAIL, TAC_PLUS_PRIV_LVL_MAX,
     TAC_PLUS_ACCT, TAC_PLUS_VIRTUAL_REM_ADDR, TAC_PLUS_VIRTUAL_PORT,
-    TAC_PLUS_AUTHEN_STATUS_FAIL, TAC_PLUS_REPLY_FLAG_NOECHO, TAC_PLUS_AUTHEN_CHPASS
+    TAC_PLUS_AUTHEN_STATUS_FAIL, TAC_PLUS_REPLY_FLAG_NOECHO, TAC_PLUS_CONTINUE_FLAG_ABORT
 )
 from .packet import TACACSPacket, TACACSHeader
 from .authentication import TACACSAuthenticationStart, TACACSAuthenticationContinue, TACACSAuthenticationReply
@@ -226,7 +226,7 @@ class TACACSClient(object):
                     'recv body <%s>' % reply
                 ]))
             while reply.getdata:
-                data = getpass.getpass(reply.server_msg.decode('ascii'))
+                data = getpass.getpass(reply.server_msg.decode('utf-8'))
                 packet = self.send(TACACSAuthenticationContinue(data),
                                     TAC_PLUS_AUTHEN,
                                     packet.seq_no + 1)
