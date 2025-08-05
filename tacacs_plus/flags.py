@@ -26,7 +26,7 @@ TAC_PLUS_AUTHEN_TYPES = {
 }
 
 # authentication flags
-# TAC_PLUS_CONTINUE_FLAG_ABORT = 0x01 # Not in RFC8907
+TAC_PLUS_CONTINUE_FLAG_ABORT = 0x01
 TAC_PLUS_REPLY_FLAG_NOECHO = 0x01
 
 # authentication statuses
