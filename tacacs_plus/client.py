@@ -213,7 +213,7 @@ class TACACSClient(object):
                 'recv body <%s>' % reply
             ]))
             if authen_type == TAC_PLUS_AUTHEN_TYPE_ASCII and reply.getpass:
-                if not password:
+                if not password and reply.flags == TAC_PLUS_REPLY_FLAG_NOECHO:
                     password = getpass.getpass('password for %s: ' % username)
 
                 packet = self.send(TACACSAuthenticationContinue(password),
@@ -225,17 +225,21 @@ class TACACSClient(object):
                     'recv header <%s>' % packet.header,
                     'recv body <%s>' % reply
                 ]))
-            while reply.getdata:
-                data = getpass.getpass(reply.server_msg.decode('utf-8'))
-                packet = self.send(TACACSAuthenticationContinue(data),
-                                    TAC_PLUS_AUTHEN,
-                                    packet.seq_no + 1)
-                reply = TACACSAuthenticationReply.unpacked(packet.body)
-                logger.debug('\n'.join([
-                    reply.__class__.__name__,
-                    'recv header <%s>' % packet.header,
-                    'recv body <%s>' % reply
-                ]))
+            elif authen_type == TAC_PLUS_AUTHEN_TYPE_ASCII and reply.getdata:
+                while reply.getdata:
+                    if reply.flags == TAC_PLUS_REPLY_FLAG_NOECHO:
+                        data = getpass.getpass(reply.server_msg.decode('utf-8'))
+                    else:
+                        data = input(reply.server_msg.decode('utf-8'))
+                    packet = self.send(TACACSAuthenticationContinue(data),
+                                        TAC_PLUS_AUTHEN,
+                                        packet.seq_no + 1)
+                    reply = TACACSAuthenticationReply.unpacked(packet.body)
+                    logger.debug('\n'.join([
+                        reply.__class__.__name__,
+                        'recv header <%s>' % packet.header,
+                        'recv body <%s>' % reply
+                    ]))
 
         return reply
 
