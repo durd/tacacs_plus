@@ -25,3 +25,5 @@ htmlcov
 
 
 venv/
+
+docs/_build

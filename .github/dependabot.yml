@@ -14,3 +14,10 @@ updates:
     groups:
       dev-tools:
         patterns: ["*"]
+  - package-ecosystem: pip
+    directory: /docs
+    schedule:
+      interval: weekly
+    groups:
+      docs-tools:
+        patterns: ["*"]

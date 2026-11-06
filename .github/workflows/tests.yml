@@ -45,3 +45,18 @@ jobs:
         with:
           name: wheel
           path: dist/*.whl
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - run: pip install -r docs/requirements.txt
+      # -W: a docstring with broken markup fails the build
+      - run: sphinx-build -W --keep-going docs docs/_build/html
+      - uses: actions/upload-artifact@v7
+        with:
+          name: docs-html
+          path: docs/_build/html

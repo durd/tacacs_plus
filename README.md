@@ -241,6 +241,14 @@ $ pytest
 $ ruff check .
 ```
 
+The API reference is built from the docstrings with Sphinx (`docs/`); CI builds
+it for every PR and keeps the HTML as the `docs-html` artifact:
+
+```
+$ pip install -r docs/requirements.txt
+$ sphinx-build -W --keep-going docs docs/_build/html
+```
+
 `tests/tacacs_server.py` is a small TACACS+ server written from RFC 8907 (PAP,
 CHAP, the ASCII login dialog and change password, an expired-password user).
 `tests/test_rfc_server.py` runs the client against it over TCP.  It shows that
