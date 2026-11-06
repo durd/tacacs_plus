@@ -59,6 +59,11 @@ def parse_args():
     if not user_password:
         authentication.add_argument('-p', '--password', required=False, help="user password")
 
+    change_password = command.add_parser('change-password',
+                                          help="change a user's password (asks for the new password)")
+    if not user_password:
+        change_password.add_argument('-p', '--password', required=False, help="current user password")
+
     authorization = command.add_parser('authorize', help="authorize a command against a tacacs+ server")
     authorization.add_argument('-c', '--cmds', required=True, nargs='+', help="list of cmds to authorize")
 
@@ -90,6 +95,16 @@ def strings_to_bytes(strings):
     return [x.encode('utf-8') for x in strings]
 
 
+def prompt(server_msg, echo):
+    """Answer a server prompt the library has no answer for; None aborts."""
+    try:
+        if echo:
+            return six.moves.input(server_msg)
+        return getpass.getpass(server_msg)
+    except EOFError:
+        return None
+
+
 def verbose_response(response):
     print("status: %s" % response.human_status)
     if response.data:
@@ -98,6 +113,8 @@ def verbose_response(response):
         print("server_msg: %s" % response.server_msg)
     if response.flags:
         print("flags: %s" % response.flags)
+    if getattr(response, 'aborted', False):
+        print("aborted by client")
     if response.arguments:
         print("av-pairs:")
         for arg in response.arguments:
@@ -105,9 +122,6 @@ def verbose_response(response):
 
 
 def authenticate(cli, args):
-    if not vars(args).get('password'):
-        args.password = getpass.getpass('password for %s: ' % args.username)
-
     chap_ppp_id = None
     chap_challenge = None
     if args.authen_type == TAC_PLUS_AUTHEN_TYPE_CHAP:
@@ -116,7 +130,16 @@ def authenticate(cli, args):
     auth = cli.authenticate(args.username, args.password, priv_lvl=args.priv_lvl,
                             authen_type=args.authen_type, chap_ppp_id=chap_ppp_id,
                             chap_challenge=chap_challenge, rem_addr=args.rem_addr,
-                            port=args.virtual_port)
+                            port=args.virtual_port, prompt=prompt)
+    if args.verbose:
+        verbose_response(auth)
+
+    return 0 if auth.valid else 1
+
+
+def change_password(cli, args):
+    auth = cli.change_password(args.username, args.password, priv_lvl=args.priv_lvl,
+                               rem_addr=args.rem_addr, port=args.virtual_port, prompt=prompt)
     if args.verbose:
         verbose_response(auth)
 
@@ -163,6 +186,8 @@ def main():
         cli = get_cli(args)
         if args.action == 'authenticate':
             sys.exit(authenticate(cli, args))
+        elif args.action == 'change-password':
+            sys.exit(change_password(cli, args))
         elif args.action == 'authorize':
             sys.exit(authorize(cli, args))
         elif args.action == 'account':

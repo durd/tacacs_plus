@@ -3,7 +3,7 @@ import socket
 import select
 import logging
 import contextlib
-import getpass
+import re
 from hashlib import md5
 
 import six
@@ -14,14 +14,23 @@ from .flags import (
     TAC_PLUS_AUTHEN, TAC_PLUS_AUTHEN_TYPE_ASCII, TAC_PLUS_AUTHEN_METH_TACACSPLUS,
     TAC_PLUS_AUTHOR, TAC_PLUS_AUTHOR_STATUS_FAIL, TAC_PLUS_PRIV_LVL_MAX,
     TAC_PLUS_ACCT, TAC_PLUS_VIRTUAL_REM_ADDR, TAC_PLUS_VIRTUAL_PORT,
-    TAC_PLUS_AUTHEN_STATUS_FAIL, TAC_PLUS_REPLY_FLAG_NOECHO, TAC_PLUS_CONTINUE_FLAG_ABORT
+    TAC_PLUS_CONTINUE_FLAG_ABORT, TAC_PLUS_AUTHEN_CHPASS
 )
 from .packet import TACACSPacket, TACACSHeader
-from .authentication import TACACSAuthenticationStart, TACACSAuthenticationContinue, TACACSAuthenticationReply
+from .authentication import (
+    TACACSAuthenticationStart, TACACSAuthenticationContinue, TACACSAuthenticationReply,
+    to_bytes
+)
 from .authorization import TACACSAuthorizationStart, TACACSAuthorizationReply
 from .accounting import TACACSAccountingStart, TACACSAccountingReply
 
 logger = logging.getLogger(__name__)
+
+# prompt texts in GETPASS/GETDATA replies, see TACACSClient._prompt_kind
+PASSWORD_PROMPT = re.compile(r'pass|secret|\bpin\b', re.I)
+NEW_PASSWORD_PROMPT = re.compile(r'\bnew\b|confirm|re-?enter|re-?type|again|verify', re.I)
+OLD_PASSWORD_PROMPT = re.compile(r'\bold\b|current|existing', re.I)
+USER_PROMPT = re.compile(r'user|login', re.I)
 
 
 class TACACSClient(object):
@@ -86,7 +95,7 @@ class TACACSClient(object):
                 self._sock.close()
                 self._sock = None
 
-    def send(self, body, req_type, seq_no=1):
+    def send(self, body, req_type, seq_no=1, expect_reply=True):
         """
         Send a TACACS+ message body
 
@@ -101,7 +110,9 @@ class TACACSClient(object):
                          packets containing odd sequence numbers, and TACACS+
                          servers only send packets containing even sequence
                          numbers.
-        :return:         TACACSPacket
+        :param expect_reply: False to return without reading a reply, e.g.
+                         after TAC_PLUS_CONTINUE_FLAG_ABORT
+        :return:         TACACSPacket, or None if `expect_reply` is False
         :raises:         socket.timeout, socket.error
         """
         # construct a packet
@@ -121,6 +132,8 @@ class TACACSClient(object):
             'sent body <%s>' % body,
         ]))
         self.sock.send(bytes(packet))
+        if not expect_reply:
+            return None
 
         readable, _, _ = select.select([self.sock], [], [], self.timeout)
         if readable:
@@ -154,12 +167,26 @@ class TACACSClient(object):
             )
         raise socket.timeout
 
+    # how often each kind of answer is sent before the client gives up on the
+    # dialog: the password twice (login, then an explicit "old password" when
+    # it must be changed), the new password twice (new + confirmation)
+    ANSWER_LIMITS = {'user': 1, 'old': 2, 'new': 2}
+
     def authenticate(self, username, password=None, priv_lvl=TAC_PLUS_PRIV_LVL_MIN,
                      authen_type=TAC_PLUS_AUTHEN_TYPE_ASCII,
                      chap_ppp_id=None, chap_challenge=None,
-                     rem_addr=TAC_PLUS_VIRTUAL_REM_ADDR, port=TAC_PLUS_VIRTUAL_PORT):
+                     rem_addr=TAC_PLUS_VIRTUAL_REM_ADDR, port=TAC_PLUS_VIRTUAL_PORT,
+                     new_password=None, prompt=None, max_steps=10,
+                     encoding='latin-1'):
         """
         Authenticate to a TACACS+ server with a username and password.
+
+        With TAC_PLUS_AUTHEN_TYPE_ASCII the server leads a dialog of
+        GETUSER/GETPASS/GETDATA replies, which are answered from `username`,
+        `password` and `new_password` (see `_authen_dialog`).  When an answer
+        is missing, `prompt` is asked; without `prompt` the client aborts the
+        session and returns the unanswered reply with `reply.aborted` set, so
+        the caller can collect the answer (e.g. a new password) and retry.
 
         :param username:
         :param password:
@@ -171,18 +198,27 @@ class TACACSClient(object):
         :param chap_challenge: challenge value when authen_type == 'chap'
         :param rem_addr:       AAA request source, default to TAC_PLUS_VIRTUAL_REM_ADDR
         :param port:           AAA port, default to TAC_PLUS_VIRTUAL_PORT
+        :param new_password:   answer when the server asks for a new password
+                               (ASCII only, e.g. an expired password)
+        :param prompt:         optional callable `prompt(server_msg, echo)`
+                               returning the answer as a string, or None to
+                               abort; used when no answer is known
+        :param max_steps:      maximum number of CONTINUE packets sent
+        :param encoding:       encoding of usernames and passwords on the wire
         :return:               TACACSAuthenticationReply
-        :raises:               socket.timeout, socket.error
+        :raises:               socket.timeout, socket.error, ValueError
         """
         start_data = six.b('')
         if authen_type in (TAC_PLUS_AUTHEN_TYPE_PAP,
                            TAC_PLUS_AUTHEN_TYPE_CHAP):
             self.version_min = TAC_PLUS_MINOR_VER_ONE
+            if not password and prompt is not None:
+                password = prompt('password for %s: ' % username, False)
             if not password:
-                password = getpass.getpass('password for %s: ' % username)
+                raise ValueError('a password is required for PAP and CHAP')
 
             if authen_type == TAC_PLUS_AUTHEN_TYPE_PAP:
-                start_data = six.b(password)
+                start_data = to_bytes(password, encoding)
 
             if authen_type == TAC_PLUS_AUTHEN_TYPE_CHAP:
                 if not isinstance(chap_ppp_id, six.string_types):
@@ -196,52 +232,139 @@ class TACACSClient(object):
                 start_data = (
                     six.b(chap_ppp_id) +
                     six.b(chap_challenge) +
-                    md5(six.b(
-                        chap_ppp_id + password + chap_challenge
-                    )).digest()
+                    md5(
+                        six.b(chap_ppp_id) +
+                        to_bytes(password, encoding) +
+                        six.b(chap_challenge)
+                    ).digest()
                 )
         with self.closing():
             packet = self.send(
                 TACACSAuthenticationStart(username, authen_type, priv_lvl,
-                                          start_data, rem_addr=rem_addr, port=port),
+                                          start_data, rem_addr=rem_addr, port=port,
+                                          encoding=encoding),
                 TAC_PLUS_AUTHEN
             )
-            reply = TACACSAuthenticationReply.unpacked(packet.body)
-            logger.debug('\n'.join([
-                reply.__class__.__name__,
-                'recv header <%s>' % packet.header,
-                'recv body <%s>' % reply
-            ]))
-            if authen_type == TAC_PLUS_AUTHEN_TYPE_ASCII and reply.getpass:
-                if not password and reply.flags == TAC_PLUS_REPLY_FLAG_NOECHO:
-                    password = getpass.getpass('password for %s: ' % username)
-
-                packet = self.send(TACACSAuthenticationContinue(password),
-                                   TAC_PLUS_AUTHEN,
-                                   packet.seq_no + 1)
-                reply = TACACSAuthenticationReply.unpacked(packet.body)
-                logger.debug('\n'.join([
-                    reply.__class__.__name__,
-                    'recv header <%s>' % packet.header,
-                    'recv body <%s>' % reply
-                ]))
-            elif authen_type == TAC_PLUS_AUTHEN_TYPE_ASCII and reply.getdata:
-                while reply.getdata:
-                    if reply.flags == TAC_PLUS_REPLY_FLAG_NOECHO:
-                        data = getpass.getpass(reply.server_msg.decode('utf-8'))
-                    else:
-                        data = input(reply.server_msg.decode('utf-8'))
-                    packet = self.send(TACACSAuthenticationContinue(data),
-                                        TAC_PLUS_AUTHEN,
-                                        packet.seq_no + 1)
-                    reply = TACACSAuthenticationReply.unpacked(packet.body)
-                    logger.debug('\n'.join([
-                        reply.__class__.__name__,
-                        'recv header <%s>' % packet.header,
-                        'recv body <%s>' % reply
-                    ]))
+            reply = self._authen_reply(packet)
+            if authen_type == TAC_PLUS_AUTHEN_TYPE_ASCII:
+                reply = self._authen_dialog(packet, reply, username, password,
+                                            new_password, prompt, max_steps,
+                                            encoding)
 
         return reply
+
+    def change_password(self, username, old_password=None, new_password=None,
+                        priv_lvl=TAC_PLUS_PRIV_LVL_MIN,
+                        rem_addr=TAC_PLUS_VIRTUAL_REM_ADDR,
+                        port=TAC_PLUS_VIRTUAL_PORT, prompt=None, max_steps=10,
+                        encoding='latin-1'):
+        """
+        Change a user's password with an ASCII TAC_PLUS_AUTHEN_CHPASS session.
+
+        The server asks for the old and the new password (usually twice) in a
+        GETPASS/GETDATA dialog, answered like in `authenticate`.
+
+        :param username:
+        :param old_password:
+        :param new_password:
+        :param priv_lvl:
+        :param rem_addr:       AAA request source, default to TAC_PLUS_VIRTUAL_REM_ADDR
+        :param port:           AAA port, default to TAC_PLUS_VIRTUAL_PORT
+        :param prompt:         see `authenticate`
+        :param max_steps:      maximum number of CONTINUE packets sent
+        :param encoding:       encoding of usernames and passwords on the wire
+        :return:               TACACSAuthenticationReply
+        :raises:               socket.timeout, socket.error
+        """
+        with self.closing():
+            packet = self.send(
+                TACACSAuthenticationStart(username, TAC_PLUS_AUTHEN_TYPE_ASCII,
+                                          priv_lvl, rem_addr=rem_addr, port=port,
+                                          action=TAC_PLUS_AUTHEN_CHPASS,
+                                          encoding=encoding),
+                TAC_PLUS_AUTHEN
+            )
+            reply = self._authen_reply(packet)
+            reply = self._authen_dialog(packet, reply, username, old_password,
+                                        new_password, prompt, max_steps, encoding)
+        return reply
+
+    def _authen_reply(self, packet):
+        reply = TACACSAuthenticationReply.unpacked(packet.body)
+        logger.debug('\n'.join([
+            reply.__class__.__name__,
+            'recv header <%s>' % packet.header,
+            'recv body <%s>' % reply
+        ]))
+        return reply
+
+    def _authen_dialog(self, packet, reply, username, password, new_password,
+                       prompt, max_steps, encoding):
+        """
+        Answer GETUSER/GETPASS/GETDATA replies until the server ends the
+        dialog (PASS, FAIL, ERROR, ...), or abort it.
+
+        Each reply is answered with the username, the (old) password or the
+        new password, see `_prompt_kind`.  Each kind is sent at most
+        ANSWER_LIMITS times.  When no answer is known and `prompt` gives none,
+        or after `max_steps` CONTINUE packets, the client sends a CONTINUE with
+        TAC_PLUS_CONTINUE_FLAG_ABORT and returns the unanswered reply with
+        `aborted` set.
+        """
+        values = {'user': username, 'old': password, 'new': new_password}
+        sent = {'user': 0, 'old': 0, 'new': 0}
+        steps = 0
+        while reply.getuser or reply.getpass or reply.getdata:
+            server_msg = reply.server_msg.decode(encoding, 'replace')
+            kind = self._prompt_kind(reply, server_msg, sent)
+            answer = None
+            if kind and sent[kind] < self.ANSWER_LIMITS[kind]:
+                answer = values[kind]
+            if answer is None and prompt is not None and steps < max_steps:
+                answer = prompt(server_msg, not reply.noecho)
+            if answer is None or steps >= max_steps:
+                self.send(
+                    TACACSAuthenticationContinue(
+                        '', flags=TAC_PLUS_CONTINUE_FLAG_ABORT),
+                    TAC_PLUS_AUTHEN,
+                    packet.seq_no + 1,
+                    expect_reply=False
+                )
+                reply.aborted = True
+                break
+
+            if kind:
+                sent[kind] += 1
+            steps += 1
+            packet = self.send(
+                TACACSAuthenticationContinue(answer, encoding=encoding),
+                TAC_PLUS_AUTHEN,
+                packet.seq_no + 1
+            )
+            reply = self._authen_reply(packet)
+        return reply
+
+    @staticmethod
+    def _prompt_kind(reply, server_msg, sent):
+        """
+        Guess what the server asks for: 'user', 'old' (the current password),
+        'new' (a new password or its confirmation) or None (unknown).
+
+        Password prompts are told apart by their text ("new", "confirm",
+        "old", ...); when the text doesn't say, the first one is the current
+        password and later ones the new password.
+        """
+        if reply.getuser:
+            return 'user'
+        if reply.getpass or reply.noecho or PASSWORD_PROMPT.search(server_msg):
+            if NEW_PASSWORD_PROMPT.search(server_msg):
+                return 'new'
+            if OLD_PASSWORD_PROMPT.search(server_msg):
+                return 'old'
+            return 'old' if not sent['old'] else 'new'
+        if USER_PROMPT.search(server_msg):
+            return 'user'
+        return None
 
     def authorize(self, username, arguments=[],
                   authen_type=TAC_PLUS_AUTHEN_TYPE_ASCII, priv_lvl=TAC_PLUS_PRIV_LVL_MIN,
