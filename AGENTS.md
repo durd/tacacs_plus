@@ -21,13 +21,15 @@ in and changes passwords with this library.
   packet classes' `__str__` goes into the debug log, so mask anything secret there
   (see `TACACSAuthenticationContinue` and `TACACSAuthenticationStart._data_for_log`)
   and check new log lines.
-- Docstrings are the API reference: `docs/api.rst` pulls them in with Sphinx autodoc,
+- Docstrings are the API reference: `docs/api/*.rst` pull them in with Sphinx autodoc,
   and CI builds it with `-W`, so broken reST markup fails the PR. Use reST field lists
   (`:param x:`, `:return:`, `:raises:`), `::` before an indented code block, and
   document constructor arguments in `__init__` (`autoclass_content = 'both'`). A new
-  public module or class needs an entry in `docs/api.rst`. Examples live in
-  `docs/usage.rst`, in Sync/Async tabs (sphinx-design `tab-set` with `:sync-group: client`)
-  that should stay in step with each other.
+  public module or class needs an entry in `docs/api/`. Examples live in `docs/guide/`,
+  one short page per topic, in Sync/Async tabs (sphinx-design `tab-set` with
+  `:sync-group: client`) that should stay in step with each other. Pages start with
+  `:hide-toc:`: the left menu (the toctrees in `docs/index.rst`) is the only menu, so a
+  new page must be added there, and Furo shows `.. contents::` as an error.
 - Logging calls pass their arguments (`logger.debug('sent <%s>', body)`), never
   f-strings or `%`/`.format()`; ruff's `G` rules check this. Everywhere else, use f-strings.
 - Every session (one TCP connection) starts with `_new_session()`: a new session_id from

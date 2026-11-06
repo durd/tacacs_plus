@@ -1,3 +1,5 @@
+:hide-toc:
+
 tacacs_plus
 ===========
 
@@ -6,9 +8,8 @@ authentication, authorization and accounting, with a non-interactive ASCII
 login and password change, and TACACS+ over TLS
 (`RFC 9887 <https://www.rfc-editor.org/rfc/rfc9887>`_).
 
-Installation, examples and the command-line client are described in the
-`README <https://github.com/durd/tacacs_plus#readme>`_.  This is the API
-reference, built from the docstrings.
+Start with :doc:`guide/start`; every page has examples you can copy.  The API
+reference is built from the docstrings.
 
 .. code-block:: python
 
@@ -22,7 +23,22 @@ reference, built from the docstrings.
    print(reply.human_status, reply.server_msg)
 
 .. toctree::
-   :maxdepth: 2
+   :caption: Guide
+   :maxdepth: 1
 
-   usage
-   api
+   guide/start
+   guide/passwords
+   guide/errors
+   guide/authorization
+   guide/tls
+   guide/web-app
+   guide/debugging
+
+.. toctree::
+   :caption: API reference
+   :maxdepth: 1
+
+   api/clients
+   api/replies
+   api/tls
+   api/internals
