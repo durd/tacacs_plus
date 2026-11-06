@@ -235,3 +235,45 @@ async def test_async_read_timeout():
             await cli.authenticate('alice', 'secret')
     finally:
         silent.close()
+
+
+@pytest.fixture
+def aaa_server():
+    srv = TacacsServer(SECRET, {'alice': 'secret'}, authorizations={
+        'alice': [b'priv-lvl=15', b'role=admin'],
+        'bob': [b'priv-lvl=1'],
+    })
+    yield srv
+    srv.close()
+
+
+def test_authorize(aaa_server):
+    reply = client(aaa_server).authorize('alice', arguments=[b'service=shell', b'cmd='])
+    assert reply.valid
+    assert reply.arguments == [b'priv-lvl=15', b'role=admin']
+    assert aaa_server.requests[-1]['arguments'] == [b'service=shell', b'cmd=']
+    assert client(aaa_server).authorize('nobody', arguments=[b'service=shell']).invalid
+
+
+def test_authorize_needs_priv_lvl(aaa_server):
+    """The client turns a pass with a lower priv-lvl than asked for into FAIL."""
+    assert client(aaa_server).authorize('bob', arguments=[b'service=shell'], priv_lvl=15).invalid
+    assert client(aaa_server).authorize('bob', arguments=[b'service=shell'], priv_lvl=1).valid
+
+
+def test_account(aaa_server):
+    from tacacs_plus.flags import TAC_PLUS_ACCT_FLAG_START, TAC_PLUS_ACCT_FLAG_STOP
+    args = [b'task_id=42', b'service=shell', b'cmd=show version']
+    assert client(aaa_server).account('alice', TAC_PLUS_ACCT_FLAG_START, arguments=args).valid
+    assert client(aaa_server).account('alice', TAC_PLUS_ACCT_FLAG_STOP, arguments=args).valid
+    assert [(a['flags'], a['arguments']) for a in aaa_server.accounting] == [
+        (TAC_PLUS_ACCT_FLAG_START, args), (TAC_PLUS_ACCT_FLAG_STOP, args)]
+
+
+@pytest.mark.asyncio
+async def test_async_authorize_and_account(aaa_server):
+    from tacacs_plus.flags import TAC_PLUS_ACCT_FLAG_START
+    cli = async_client(aaa_server)
+    reply = await cli.authorize('alice', arguments=[b'service=shell'])
+    assert reply.valid and b'role=admin' in reply.arguments
+    assert (await cli.account('alice', TAC_PLUS_ACCT_FLAG_START, arguments=[b'task_id=1'])).valid

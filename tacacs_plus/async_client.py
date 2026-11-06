@@ -56,6 +56,14 @@ class TACACSClient:
 
     The same API as tacacs_plus.client.TACACSClient, with coroutines.
 
+    Example::
+
+        from tacacs_plus.async_client import TACACSClient
+
+        cli = TACACSClient('tacacs.example.com', 49, 'shared-secret')
+        reply = await cli.authenticate('alice', 'password')
+        print(reply.valid)
+
     An open source TACACS+ server daemon is available at
     http://www.shrubbery.net/tac_plus/
     """

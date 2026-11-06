@@ -15,6 +15,15 @@ def tls_context(cafile=None, capath=None, cadata=None, certfile=None,
     An ssl.SSLContext for TACACS+ over TLS: TLS 1.3 or newer, and the
     server's certificate and hostname verified.
 
+    Example::
+
+        from tacacs_plus.client import TACACSClient
+        from tacacs_plus.tls import tls_context
+
+        tls = tls_context(cafile='tacacs-ca.pem')
+        cli = TACACSClient('tacacs.example.com', 300, None, tls=tls)
+        reply = cli.authenticate('alice', 'password')
+
     RFC 9887 also asks for revocation checking, which Python's ssl module
     does only with CRLs you load yourself: call
     `context.load_verify_locations(crl_file)` and set
