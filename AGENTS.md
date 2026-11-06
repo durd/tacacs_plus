@@ -30,8 +30,9 @@ in and changes passwords with this library.
   `:sync-group: client`) that should stay in step with each other. The left menu lists
   pages (the toctrees in `docs/index.rst`; add new pages there), Furo's right-hand menu
   lists the current page's sections. Don't add `.. contents::`: Furo shows it as an error.
-- `docs/about.rst` says what is tested, what isn't and the limitations. Keep it true:
-  update it when something gets tested (e.g. against ISE) or a limitation is lifted.
+- `docs/about.rst` and the README's "Status" section say what is tested, what isn't and
+  the limitations. Keep both true: update them when something gets tested (e.g.
+  against ISE) or a limitation is lifted.
 - Logging calls pass their arguments (`logger.debug('sent <%s>', body)`), never
   f-strings or `%`/`.format()`; ruff's `G` rules check this. Everywhere else, use f-strings.
 - Every session (one TCP connection) starts with `_new_session()`: a new session_id from
