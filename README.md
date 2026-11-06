@@ -1,6 +1,8 @@
 # TACACS+ Python client
 
-[![Build Status](https://travis-ci.org/ansible/tacacs_plus.svg?branch=master)](https://travis-ci.org/ansible/tacacs_plus)
+A maintained fork of [ansible/tacacs_plus](https://github.com/ansible/tacacs_plus),
+which is archived.  Version 3.0.0 adds a non-interactive ASCII login and
+password change (see below); the library no longer reads from the terminal.
 
 A TACACS+ client that supports authentication, authorization and
 accounting.

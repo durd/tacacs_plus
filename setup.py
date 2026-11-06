@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-version = '2.6'
+version = '3.0.0'
 
 setup(
     name='tacacs_plus',
@@ -28,11 +28,12 @@ setup(
     keywords='tacas tacacs+ tacacs_plus auth authentication pap chap',
     author='Ryan Petrello',
     author_email='ryan@ryanpetrello.com',
-    url='http://github.com/ansible/tacacs_plus',
+    maintainer='durd',
+    maintainer_email='brodin@durd.net',
+    url='https://github.com/durd/tacacs_plus',
     license='BSD',
     packages=find_packages(exclude=['examples']),
     install_requires=['six'],
-    setup_requires=['pytest-runner'],
     tests_require=['pytest', 'pytest-cov'],
     include_package_data=True,
     scripts=['bin/tacacs_client'],
