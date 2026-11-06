@@ -139,3 +139,36 @@ print("PASS!" if acct.valid else "FAIL!")
 acct = cli.account('username', TAC_PLUS_ACCT_FLAG_STOP, arguments=[b"service=shell", b"cmd=exit"])
 print("PASS!" if acct.valid else "FAIL!")
 ```
+
+#### Non-interactive ASCII login and password change
+
+With ASCII authentication the server leads a dialog (GETUSER, GETPASS,
+GETDATA).  The client answers it from the values it is given and never reads
+from the terminal itself, so it can run inside a web application:
+
+```python
+from tacacs_plus.client import TACACSClient
+
+cli = TACACSClient('host', 49, 'secret')
+
+# a user whose password must be changed at login
+authen = cli.authenticate('username', 'password', encoding='utf-8')
+if authen.getdata and authen.aborted:
+    # the server asked for something we had no answer for, e.g. a new
+    # password; the session was aborted, authen.server_msg has the prompt
+    authen = cli.authenticate('username', 'password', new_password='new',
+                              encoding='utf-8')
+
+# change a password (action CHPASS)
+authen = cli.change_password('username', 'old', 'new', encoding='utf-8')
+print(authen.human_status, authen.server_msg)
+```
+
+Password prompts are matched by their text ("new", "confirm", "old", ...)
+and otherwise by order: the first one gets the password, later ones the new
+password.  The dialog is aborted after `max_steps` (default 10) answers, or
+when the server asks for the same thing too often (e.g. it rejects the new
+password).  `encoding` (default `latin-1`, as before) is used for the
+username and passwords.  Pass `prompt=callable(server_msg, echo)` to ask a
+user for answers the client doesn't have; `tacacs_client` does that.
+

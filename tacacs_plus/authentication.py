@@ -6,23 +6,38 @@ from .flags import (
     TAC_PLUS_PRIV_LVL_MIN, TAC_PLUS_AUTHEN_LOGIN, TAC_PLUS_AUTHEN_SVC_LOGIN,
     TAC_PLUS_AUTHEN_STATUS_PASS, TAC_PLUS_AUTHEN_STATUS_FAIL, TAC_PLUS_AUTHEN_STATUS_ERROR,
     TAC_PLUS_AUTHEN_STATUS_GETPASS, TAC_PLUS_VIRTUAL_PORT, TAC_PLUS_VIRTUAL_REM_ADDR,
-    TAC_PLUS_AUTHEN_STATUS_GETDATA
+    TAC_PLUS_AUTHEN_STATUS_GETDATA, TAC_PLUS_AUTHEN_STATUS_GETUSER,
+    TAC_PLUS_AUTHEN_STATUS_RESTART, TAC_PLUS_AUTHEN_STATUS_FOLLOW,
+    TAC_PLUS_REPLY_FLAG_NOECHO
 )
+
+
+def to_bytes(value, encoding='latin-1'):
+    """
+    Encode text with `encoding`; bytes are passed through unchanged.
+
+    The default, latin-1, is what `six.b()` did before `encoding` existed.
+    """
+    if isinstance(value, six.binary_type):
+        return value
+    return value.encode(encoding)
 
 
 class TACACSAuthenticationStart(object):
 
     def __init__(self, username, authen_type, priv_lvl=TAC_PLUS_PRIV_LVL_MIN,
                  data=six.b(''), rem_addr=TAC_PLUS_VIRTUAL_REM_ADDR,
-                 port=TAC_PLUS_VIRTUAL_PORT):
+                 port=TAC_PLUS_VIRTUAL_PORT, action=TAC_PLUS_AUTHEN_LOGIN,
+                 encoding='latin-1'):
         self.username = username
-        self.action = TAC_PLUS_AUTHEN_LOGIN
+        self.action = action
         self.priv_lvl = priv_lvl
         self.authen_type = authen_type
         self.service = TAC_PLUS_AUTHEN_SVC_LOGIN
         self.data = data
         self.rem_addr = rem_addr
         self.port = port
+        self.encoding = encoding
 
     @property
     def packed(self):
@@ -44,9 +59,9 @@ class TACACSAuthenticationStart(object):
 
         # B = unsigned char
         # s = char[]
-        username = six.b(self.username)
-        rem_addr = six.b(self.rem_addr)
-        port = six.b(self.port)
+        username = to_bytes(self.username, self.encoding)
+        rem_addr = to_bytes(self.rem_addr, self.encoding)
+        port = to_bytes(self.port, self.encoding)
         data = self.data
         body = struct.pack(
             'B' * 8,
@@ -81,10 +96,11 @@ class TACACSAuthenticationStart(object):
 
 
 class TACACSAuthenticationContinue(object):
-    def __init__(self, password, data=six.b(''), flags=0):
+    def __init__(self, password, data=six.b(''), flags=0, encoding='latin-1'):
         self.password = password
         self.data = data
         self.flags = flags
+        self.encoding = encoding
 
     @property
     def packed(self):
@@ -101,7 +117,7 @@ class TACACSAuthenticationContinue(object):
         # B = unsigned char
         # !H = network-order (big-endian) unsigned short
         # s = char[]
-        password = six.b(self.password)
+        password = to_bytes(self.password, self.encoding)
         data = self.data
         return (
             struct.pack('!H', len(password)) +
@@ -113,8 +129,8 @@ class TACACSAuthenticationContinue(object):
 
     def __str__(self):
         return ', '.join([
-            'data_len: 0',
-            'flags: 0',
+            'data_len: %d' % len(self.data),
+            'flags: %s' % self.flags,
             'user_msg: %s' % ('*' * len(self.password)),
             'user_msg_len: %s' % len(self.password)
         ])
@@ -128,6 +144,9 @@ class TACACSAuthenticationReply(object):
         self.server_msg = server_msg
         self.data = data
         self.arguments = []
+        # set by the client when it ended the dialog with
+        # TAC_PLUS_CONTINUE_FLAG_ABORT instead of answering this reply
+        self.aborted = False
 
     @classmethod
     def unpacked(cls, raw):
@@ -171,13 +190,24 @@ class TACACSAuthenticationReply(object):
         return self.status == TAC_PLUS_AUTHEN_STATUS_GETDATA
 
     @property
+    def getuser(self):
+        return self.status == TAC_PLUS_AUTHEN_STATUS_GETUSER
+
+    @property
+    def noecho(self):
+        return bool(self.flags & TAC_PLUS_REPLY_FLAG_NOECHO)
+
+    @property
     def human_status(self):
         return {
             TAC_PLUS_AUTHEN_STATUS_PASS: 'PASS',
             TAC_PLUS_AUTHEN_STATUS_FAIL: 'FAIL',
             TAC_PLUS_AUTHEN_STATUS_GETPASS: 'GETPASS',
             TAC_PLUS_AUTHEN_STATUS_GETDATA: 'GETDATA',
-            TAC_PLUS_AUTHEN_STATUS_ERROR: 'ERROR'
+            TAC_PLUS_AUTHEN_STATUS_GETUSER: 'GETUSER',
+            TAC_PLUS_AUTHEN_STATUS_RESTART: 'RESTART',
+            TAC_PLUS_AUTHEN_STATUS_ERROR: 'ERROR',
+            TAC_PLUS_AUTHEN_STATUS_FOLLOW: 'FOLLOW'
         }.get(self.status, 'UNKNOWN: %s' % self.status)
 
     def __str__(self):
