@@ -10,6 +10,9 @@ numbers, CONTINUE and abort). It is not evidence of how Cisco ISE behaves: the p
 texts and their order ("Password: ", "Enter new password: ", "Confirm new password: ")
 are the same guesses the client makes, not taken from ISE.
 
+With `tls` (a server-side ssl.SSLContext) it speaks TACACS+ over TLS (RFC 9887): packets
+must have the unencrypted flag set and are not obfuscated; others are dropped.
+
 Copied from durd/ise-cpp (tools/tacacs-probe branch); this repository has the main copy.
 """
 import hashlib
@@ -22,6 +25,7 @@ LOGIN, CHPASS = 0x01, 0x02
 ASCII, PAP, CHAP = 0x01, 0x02, 0x03
 PASS, FAIL, GETDATA, GETUSER, GETPASS, ERROR = 0x01, 0x02, 0x03, 0x04, 0x05, 0x07
 NOECHO = 0x01
+UNENCRYPTED = 0x01  # header flag
 
 
 def _pad(session_id, key, version, seq_no, length):
@@ -48,8 +52,9 @@ def _recv(conn, size):
 
 
 class TacacsServer:
-    def __init__(self, secret, passwords, error_users=(), chpass=True, encoding='latin-1'):
-        self.key = secret.encode()
+    def __init__(self, secret, passwords, error_users=(), chpass=True, encoding='latin-1', tls=None):
+        self.key = secret.encode() if secret else b''
+        self.tls = tls                      # server-side ssl.SSLContext, or None
         self.chpass = chpass                # False: answer CHPASS with ERROR
         self.encoding = encoding            # how passwords are expected on the wire
         self.passwords = passwords          # user -> password
@@ -67,16 +72,22 @@ class TacacsServer:
                 conn, _ = self.sock.accept()
             except OSError:
                 return
-            with conn:
-                try:
+            try:
+                if self.tls:
+                    conn = self.tls.wrap_socket(conn, server_side=True)
+                with conn:
                     self._handle(conn)
-                except (ConnectionError, struct.error, ValueError):
-                    pass  # e.g. wrong shared secret: drop the connection, like ISE
+            except (OSError, struct.error, ValueError):
+                conn.close()  # e.g. wrong shared secret or TLS failure: drop it, like ISE
 
     def _read(self, conn):
         header = _recv(conn, 12)
         version, ptype, seq_no, flags, session_id, length = struct.unpack('!BBBB4sI', header)
-        body = _xor(_recv(conn, length), _pad(session_id, self.key, version, seq_no, length))
+        if self.tls and not flags & UNENCRYPTED:
+            raise ConnectionError('obfuscated packet over TLS')  # RFC 9887
+        body = _recv(conn, length)
+        if not flags & UNENCRYPTED:
+            body = _xor(body, _pad(session_id, self.key, version, seq_no, length))
         return (version, ptype, seq_no, flags, session_id), body
 
     def _reply(self, conn, head, status, msg='', flags=0):
@@ -85,7 +96,9 @@ class TacacsServer:
         reply = struct.pack('!BBHH', status, flags, len(msg), 0) + msg
         reply_seq = seq_no + 1
         header = struct.pack('!BBBB4sI', version, ptype, reply_seq, header_flags, session_id, len(reply))
-        conn.sendall(header + _xor(reply, _pad(session_id, self.key, version, reply_seq, len(reply))))
+        if not header_flags & UNENCRYPTED:
+            reply = _xor(reply, _pad(session_id, self.key, version, reply_seq, len(reply)))
+        conn.sendall(header + reply)
 
     def _ask(self, conn, status, msg, flags=NOECHO):
         """Send a GET* reply and return the CONTINUE's user_msg (None if aborted)."""
@@ -101,7 +114,8 @@ class TacacsServer:
         rest = body[8:]
         user = rest[:user_len].decode(self.encoding)
         data = rest[user_len + port_len + addr_len:][:data_len]
-        request = {'type': self._head[1], 'version': self._head[0], 'session_id': self._head[4], 'action': action, 'user': user, 'priv_lvl': priv_lvl, 'authen_type': authen_type}
+        request = {'type': self._head[1], 'version': self._head[0], 'session_id': self._head[4],
+                   'flags': self._head[3], 'tls': bool(self.tls), 'action': action, 'user': user, 'priv_lvl': priv_lvl, 'authen_type': authen_type}
         self.requests.append(request)
         self.prompts_answered = []
         if authen_type == PAP:

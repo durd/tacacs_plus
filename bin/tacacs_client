@@ -8,6 +8,7 @@ import argparse
 
 
 from tacacs_plus.client import TACACSClient
+from tacacs_plus.tls import tls_context
 from tacacs_plus.flags import (
     TAC_PLUS_AUTHEN_TYPES, TAC_PLUS_PRIV_LVL_MIN, TAC_PLUS_VIRTUAL_REM_ADDR,
     TAC_PLUS_VIRTUAL_PORT, TAC_PLUS_ACCT_FLAGS, TAC_PLUS_AUTHEN_TYPE_CHAP
@@ -28,7 +29,8 @@ def parse_args():
             * Authorization supports AV pairs and single commands.
             * Accounting support AV pairs and single commands.
 
-        NOTE: shared encryption key can be set via environment variable TACACS_PLUS_KEY or via argument.
+        NOTE: shared encryption key can be set via environment variable TACACS_PLUS_KEY or via argument
+              (not used with TLS).
         NOTE: user password can be setup via environment variable TACACS_PLUS_PWD or via argument.
         """
     )
@@ -46,6 +48,14 @@ def parse_args():
     parser.add_argument('-d', '--debug', action='store_true', help="enable debugging output")
     parser.add_argument('-v', '--verbose', action='store_true', help="print responses")
     parser.add_argument('-6', '--v6', action='store_true', help="use IPv6 addresses")
+    tls = parser.add_argument_group('TACACS+ over TLS (RFC 9887)',
+                                    'Any of these turns TLS on; then no shared key is used and -p is the TLS port.')
+    tls.add_argument('--tls', action='store_true', help="use TLS, verifying the server against the system's CAs")
+    tls.add_argument('--tls-ca', metavar='FILE', help="CA certificate(s) (PEM) that signed the server's certificate")
+    tls.add_argument('--tls-cert', metavar='FILE', help="client certificate (PEM), if the server asks for one")
+    tls.add_argument('--tls-key', metavar='FILE', help="private key of the client certificate, if not in --tls-cert")
+    tls.add_argument('--tls-server-name', metavar='NAME',
+                     help="name the server's certificate must match (default: --host)")
 
     if not tacacs_key:
         parser.add_argument('-k', '--key', required=False, help="tacacs+ shared encryption key")
@@ -169,13 +179,17 @@ def account(cli, args):
 
 
 def get_cli(args):
+    family = socket.AF_INET
+    if args.v6:
+        family = socket.AF_INET6
+    if args.tls or args.tls_ca or args.tls_cert or args.tls_server_name:
+        context = tls_context(cafile=args.tls_ca, certfile=args.tls_cert, keyfile=args.tls_key)
+        return TACACSClient(args.host, args.port, None, timeout=args.timeout, family=family,
+                            tls=context, tls_server_name=args.tls_server_name)
     if not args.key:
         args.key = getpass.getpass("tacacs+ shared key: ")
     if not args.key:
         args.key = None
-    family = socket.AF_INET
-    if args.v6:
-        family = socket.AF_INET6
     return TACACSClient(args.host, args.port, args.key, timeout=args.timeout, family=family)
 
 

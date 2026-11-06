@@ -23,9 +23,11 @@ from .flags import (
     TAC_PLUS_VIRTUAL_PORT,
     TAC_PLUS_AUTHEN_CHPASS,
     TAC_PLUS_CONTINUE_FLAG_ABORT,
+    TAC_PLUS_UNENCRYPTED_FLAG,
 )
 from .authen_dialog import AuthenDialog, start_data
 from .exceptions import TACACSProtocolError
+from .tls import check_tls
 from .packet import TACACSPacket, TACACSHeader
 from .authentication import (
     TACACSAuthenticationStart,
@@ -68,12 +70,15 @@ class TACACSClient:
         family=socket.AF_INET,
         version_max=TAC_PLUS_MAJOR_VER,
         version_min=TAC_PLUS_MINOR_VER,
+        tls=None,
+        tls_server_name=None,
     ):
         """
         :param host:        hostname or address of the TACACS+ server
         :param port:        port of the TACACS+ server, generally 49
         :param secret:      the secret key used to obfuscate packet bodies; can
-                            be None to disable packet body obfuscation
+                            be None to disable packet body obfuscation, and
+                            must be `None` with `tls`
         :param timeout:     seconds to wait for the connection and each reply
         :param session_id:  a 32-bit int used as session_id for every
                             session; leave it empty (the default) so each
@@ -81,6 +86,11 @@ class TACACSClient:
         :param family:      socket.AF_INET or socket.AF_INET6
         :param version_max: TACACS+ major version number, 12
         :param version_min: TACACS+ minor version number, 0 or 1
+        :param tls:         an ssl.SSLContext for TACACS+ over TLS (RFC 9887),
+                            see tacacs_plus.tls.tls_context(); `port` is then
+                            the server's TLS port
+        :param tls_server_name: the name the server's certificate must match
+                            (and SNI); default `host`
         """
         self.host = host
         self.port = port
@@ -89,6 +99,9 @@ class TACACSClient:
         self.version_max = version_max
         self.version_min = version_min
         self.family = family
+        check_tls(tls, secret)
+        self.tls = tls
+        self.tls_server_name = tls_server_name
 
         # the minor version for sessions other than PAP/CHAP authentication
         self._version_min = version_min
@@ -117,7 +130,9 @@ class TACACSClient:
     async def flow_control(self):
         try:
             reader, writer = await asyncio.wait_for(
-                asyncio.open_connection(self.host, self.port, family=self.family),
+                asyncio.open_connection(
+                    self.host, self.port, family=self.family, ssl=self.tls,
+                    server_hostname=(self.tls_server_name or self.host) if self.tls else None),
                 self.timeout)
         except asyncio.TimeoutError:
             # asyncio.TimeoutError is only the builtin TimeoutError from 3.11
@@ -162,6 +177,7 @@ class TACACSClient:
             self.session_id,
             len(body.packed),
             seq_no=seq_no,
+            flags=(0 if self.secret else TAC_PLUS_UNENCRYPTED_FLAG),
         )
         packet = TACACSPacket(header, body.packed, self.secret)
 
@@ -189,6 +205,9 @@ class TACACSClient:
                          resp_header.packed)
             raise TACACSProtocolError(
                 f'unexpected reply header <{resp_header}>')
+        # RFC 9887: over TLS, packets must not be obfuscated
+        if self.tls is not None and not resp_header.flags & TAC_PLUS_UNENCRYPTED_FLAG:
+            raise TACACSProtocolError('obfuscated reply over TLS')
 
         # read the number of bytes specified in the response header
         body_bytes = await self._read_exactly(reader, resp_header.length, self.timeout)

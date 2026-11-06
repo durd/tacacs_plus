@@ -25,6 +25,10 @@ TAC_PLUS_AUTHEN_TYPES = {
     'chap': TAC_PLUS_AUTHEN_TYPE_CHAP,
 }
 
+# header flags
+TAC_PLUS_UNENCRYPTED_FLAG = 0x01  # body not obfuscated (always set with TLS)
+TAC_PLUS_SINGLE_CONNECT_FLAG = 0x04
+
 # authentication flags
 TAC_PLUS_CONTINUE_FLAG_ABORT = 0x01
 TAC_PLUS_REPLY_FLAG_NOECHO = 0x01

@@ -66,6 +66,13 @@ in and changes passwords with this library.
   answer limits) is in `authen_dialog.py`; each keeps its own send loop. Change and
   test both: `tests/test_rfc_server.py` runs the async client against the test server
   too. ise-cpp uses the sync one.
+- **TLS (`tacacs_plus/tls.py`, RFC 9887):** with `tls`, `secret` must be None, packets
+  carry `TAC_PLUS_UNENCRYPTED_FLAG` and aren't obfuscated, and a reply without the flag
+  is a `TACACSProtocolError`. `check_tls()` refuses contexts that allow TLS < 1.3 or
+  don't verify the server. In the sync client, check `sock.pending()` before
+  `select()`: decrypted data can sit in the SSL buffer, where select doesn't see it.
+  The TLS tests make their certificates with the `openssl` command
+  (`tests/conftest.py`) and are skipped without it.
 - **A `session_id` passed to `TACACSClient()` is used for every session.** It exists for
   tests; don't pass one in real code.
 - **Errors:** `TimeoutError` when no reply comes in time, `TACACSProtocolError` (a
@@ -84,5 +91,6 @@ Not yet fixed; don't assume otherwise.
 - Unverified against ISE 3.4p7: its prompt texts and order, whether it supports CHPASS,
   and whether it expects UTF-8 or Latin-1. A probe (`tools/tacacs_probe.py` on ise-cpp's
   `tools/tacacs-probe` branch) still has to be run.
-- Obfuscation is MD5-based (RFC 8907 says to use TACACS+ only on secure networks);
-  TACACS+ over TLS (RFC 9887) isn't supported.
+- TACACS+ over TLS is tested only against the test server, not ISE: ISE supports it
+  but it isn't enabled yet (it needs TLS 1.3 turned on in ISE first). Without TLS,
+  obfuscation is MD5-based (RFC 8907 says to use TACACS+ only on secure networks).
