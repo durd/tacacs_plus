@@ -1,0 +1,30 @@
+name: release
+
+# Push a tag like v3.0.0 (matching `version` in setup.py) to build the wheel
+# and sdist and publish them as a GitHub release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Check that the tag matches setup.py
+        run: |
+          version=$(python -c "import re; print(re.search(r\"^version = '(.+)'\", open('setup.py').read(), re.M)[1])")
+          test "v$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME != setup.py version $version"; exit 1; }
+      - run: pip install build pytest pytest-cov pytest-asyncio
+      - run: python -m pytest
+      - run: python -m build
+      - name: Create the release
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}

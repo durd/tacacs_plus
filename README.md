@@ -19,8 +19,9 @@ operating systems.
 ### Basic Installation and Usage
 
 This fork isn't on PyPI, where `tacacs_plus` is the archived upstream 2.6.
-Install it from git, or build a wheel with `pip wheel --no-deps .` (CI also
-builds one for each push) and upload it to your own index.
+Install it from git, or download the wheel from a
+[GitHub release](https://github.com/durd/tacacs_plus/releases) (or build one
+with `pip wheel --no-deps .`) and upload it to your own index.
 
 ```
 $ pip install git+https://github.com/durd/tacacs_plus.git
