@@ -10,7 +10,10 @@ in and changes passwords with this library.
 ## Rules
 
 - Work on a feature branch and open a PR against `main`; never commit to `main`
-  directly. CI (pytest on Python 3.10-3.15, ruff, wheel build) must pass before merging.
+  directly. CI (pytest on Python 3.10-3.15, ruff, wheel build) must pass before merging;
+  branch protection enforces both, for admins too. If you rename a CI job or change the
+  Python matrix, update the required checks in the branch protection to match, or PRs
+  can't be merged.
 - The library never reads from the terminal or prints. Answers it doesn't have come from
   the caller's `prompt(server_msg, echo)` callback, or the session is aborted. Only the
   CLI (`bin/tacacs_client`) uses `getpass`/`input`.
@@ -33,6 +36,8 @@ in and changes passwords with this library.
   dialog logic with a scripted socket (`tests/test_authen_dialog.py`).
 - Don't run tests or the CLI against a production ISE or TACACS+ server: the change
   password calls change real passwords.
+- Dev tools are pinned in `requirements-dev.txt` (CI, tox and the release use it);
+  Dependabot updates them and the GitHub Actions versions weekly.
 - No runtime dependencies (standard library only) and Python 3.10+. Keep it that way;
   the production server installs the wheel without internet.
 - Versioning is semantic, in `setup.py`. A change in behavior that callers can notice
@@ -68,7 +73,7 @@ in and changes passwords with this library.
   other `OSError`s from the socket, `ValueError` for bad arguments.
 - **ruff reads `ruff.toml`**, not `setup.cfg`. Files without `.py` are only linted when
   named: `ruff check . bin/tacacs_client tacacs_client`.
-- **Tests:** `pip install -e . pytest pytest-cov pytest-asyncio ruff`, then `pytest` from
+- **Tests:** `pip install -e . -r requirements-dev.txt`, then `pytest` from
   the repo root. `setup.cfg` adds coverage options, so pytest needs `pytest-cov`.
   `tests/` is excluded from the wheel.
 
