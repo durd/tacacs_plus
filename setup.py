@@ -31,7 +31,7 @@ setup(
     maintainer_email='brodin@durd.net',
     url='https://github.com/durd/tacacs_plus',
     license='BSD',
-    packages=find_packages(exclude=['examples']),
+    packages=find_packages(exclude=['examples', 'tests', 'tests.*']),
     python_requires='>=3.10',
     tests_require=['pytest', 'pytest-cov'],
     include_package_data=True,

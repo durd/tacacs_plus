@@ -22,8 +22,6 @@ from .flags import (
     TAC_PLUS_ACCT,
     TAC_PLUS_VIRTUAL_REM_ADDR,
     TAC_PLUS_VIRTUAL_PORT,
-    TAC_PLUS_AUTHEN_STATUS_FAIL,
-    TAC_PLUS_CONTINUE_FLAG_ABORT,
 )
 from .exceptions import TACACSProtocolError
 from .packet import TACACSPacket, TACACSHeader
@@ -41,8 +39,12 @@ logger = logging.getLogger(__name__)
 
 class TACACSClient:
     """
-    A TACACS+ authentication client.
-    https://datatracker.ietf.org/doc/draft-ietf-opsawg-tacacs
+    An asyncio TACACS+ client for authentication, authorization and accounting.
+    https://www.rfc-editor.org/rfc/rfc8907
+
+    Unlike tacacs_plus.client.TACACSClient, it answers only one GETPASS in an
+    ASCII login and has no new_password, change_password, prompt or encoding:
+    any further question from the server is returned as the reply.
 
     An open source TACACS+ server daemon is available at
     http://www.shrubbery.net/tac_plus/
@@ -60,12 +62,14 @@ class TACACSClient:
         version_min=TAC_PLUS_MINOR_VER,
     ):
         """
-        :param host:        hostname of the TACACS+ server
+        :param host:        hostname or address of the TACACS+ server
         :param port:        port of the TACACS+ server, generally 49
         :param secret:      the secret key used to obfuscate packet bodies; can
                             be None to disable packet body obfuscation
+        :param timeout:     seconds to wait for the connection and each reply
         :param session_id:  a unique 32-bit int representing the session; if
                             left empty, one will be auto-generated
+        :param family:      socket.AF_INET or socket.AF_INET6
         :param version_max: TACACS+ major version number, 12
         :param version_min: TACACS+ minor version number, 0 or 1
         """
@@ -106,9 +110,10 @@ class TACACSClient:
 
     async def send(self, body, req_type, seq_no=1, reader=None, writer=None):
         """
-        Send a TACACS+ message body
+        Send one TACACS+ packet and read the server's reply.
 
-        :param body:     packed bytes, i.e., struct.pack(...)
+        :param body:     a packet body object with `packed` bytes, e.g.
+                         TACACSAuthenticationStart
         :param req_type: TAC_PLUS_AUTHEN,
                          TAC_PLUS_AUTHOR,
                          TAC_PLUS_ACCT
@@ -194,13 +199,16 @@ class TACACSClient:
         Authenticate to a TACACS+ server with a username and password.
 
         :param username:
-        :param password:
-        :param priv_lvl:
+        :param password:       the user's (current) password
+        :param priv_lvl:       privilege level the user asks for, 0-15
         :param authen_type:    TAC_PLUS_AUTHEN_TYPE_ASCII,
                                TAC_PLUS_AUTHEN_TYPE_PAP,
                                TAC_PLUS_AUTHEN_TYPE_CHAP
-        :param chap_ppp_id:    PPP ID when authen_type == 'chap'
-        :param chap_challenge: challenge value when authen_type == 'chap'
+        :param chap_ppp_id:    with TAC_PLUS_AUTHEN_TYPE_CHAP: the PPP ID, a
+                               1-character string
+        :param chap_challenge: with TAC_PLUS_AUTHEN_TYPE_CHAP: the challenge, a
+                               string of up to 255 characters (latin-1, so
+                               each character is one byte)
         :param rem_addr:       AAA request source, default to TAC_PLUS_VIRTUAL_REM_ADDR
         :param port:           AAA port, default to TAC_PLUS_VIRTUAL_PORT
         :return:               TACACSAuthenticationReply
@@ -261,9 +269,6 @@ class TACACSClient:
                 logger.debug('%s\nrecv header <%s>\nrecv body <%s>',
                              reply.__class__.__name__, packet.header, reply)
 
-                if reply.flags == TAC_PLUS_CONTINUE_FLAG_ABORT:
-                    reply.status = TAC_PLUS_AUTHEN_STATUS_FAIL
-
         return reply
 
     async def authorize(
@@ -279,14 +284,17 @@ class TACACSClient:
         Authorize with a TACACS+ server.
 
         :param username:
-        :param arguments:      The authorization arguments
+        :param arguments:      AV pairs as bytes, e.g. [b'service=shell',
+                               b'cmd=show', b'cmd-arg=version']
         :param authen_type:    TAC_PLUS_AUTHEN_TYPE_ASCII,
                                TAC_PLUS_AUTHEN_TYPE_PAP,
                                TAC_PLUS_AUTHEN_TYPE_CHAP
-        :param priv_lvl:       Minimal Required priv_lvl.
+        :param priv_lvl:       minimal required privilege level; if the server
+                               answers with a lower priv-lvl, the reply's
+                               status is set to TAC_PLUS_AUTHOR_STATUS_FAIL
         :param rem_addr:       AAA request source, default to TAC_PLUS_VIRTUAL_REM_ADDR
         :param port:           AAA port, default to TAC_PLUS_VIRTUAL_PORT
-        :return:               TACACSAuthenticationReply
+        :return:               TACACSAuthorizationReply
         :raises:               TimeoutError, OSError (TACACSProtocolError
                                for a reply that isn't TACACS+)
         """
@@ -343,11 +351,12 @@ class TACACSClient:
         :param flags:          TAC_PLUS_ACCT_FLAG_START,
                                TAC_PLUS_ACCT_FLAG_WATCHDOG,
                                TAC_PLUS_ACCT_FLAG_STOP
-        :param arguments:      The authorization arguments
+        :param arguments:      AV pairs as bytes, e.g. [b'service=shell',
+                               b'cmd=show', b'cmd-arg=version']
         :param authen_type:    TAC_PLUS_AUTHEN_TYPE_ASCII,
                                TAC_PLUS_AUTHEN_TYPE_PAP,
                                TAC_PLUS_AUTHEN_TYPE_CHAP
-        :param priv_lvl:       Minimal Required priv_lvl.
+        :param priv_lvl:       the user's privilege level
         :param rem_addr:       AAA request source, default to TAC_PLUS_VIRTUAL_REM_ADDR
         :param port:           AAA port, default to TAC_PLUS_VIRTUAL_PORT
         :return:               TACACSAccountingReply

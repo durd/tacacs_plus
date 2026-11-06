@@ -20,7 +20,7 @@ def crypt(header, body_bytes, secret):
     to obfuscate the body of sent packets.  Only the packet body (not
     the header) is obfuscated.
 
-    https://datatracker.ietf.org/doc/draft-ietf-opsawg-tacacs/?include_text=1#section-3.7
+    https://www.rfc-editor.org/rfc/rfc8907#section-4.5
 
     ENCRYPTED {data} == data ^ pseudo_pad
 
