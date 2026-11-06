@@ -114,9 +114,9 @@ Not yet fixed; don't assume otherwise.
 - Single-connection mode (`TAC_PLUS_SINGLE_CONNECT_FLAG`) is left out on purpose: ise-cpp
   makes a few requests a minute, so one connection per session costs nothing, while
   reusing connections needs open-connection handling, reconnects and thread safety.
-  Ask the user before implementing it. FOLLOW and RESTART replies are returned, not
-  acted on; RFC 8907 says a client that doesn't retry RESTART must treat it as FAIL,
-  and FOLLOW (deprecated) should be treated as FAIL. `reply.invalid` is only true for
-  FAIL, so callers must check `reply.valid` (see `docs/about.rst`).
+  Ask the user before implementing it. FOLLOW and RESTART replies aren't acted on
+  (no retry, no other server); as RFC 8907 says, `reply.invalid` is true for them
+  (authorization: FOLLOW), and `reply.restart`/`reply.follow` tell them apart from
+  FAIL (see `docs/about.rst`).
 - Certificate revocation (RFC 9887 asks for it) is only checked if the caller loads
   CRLs into the context; OCSP isn't supported (see `tls_context()`).

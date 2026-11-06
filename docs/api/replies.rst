@@ -8,7 +8,7 @@ Authentication
 --------------
 
 .. autoclass:: tacacs_plus.authentication.TACACSAuthenticationReply
-   :members: valid, invalid, error, getuser, getpass, getdata, noecho, human_status
+   :members: valid, invalid, error, getuser, getpass, getdata, restart, follow, noecho, human_status
 
 Authorization
 -------------

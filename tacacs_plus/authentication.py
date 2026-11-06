@@ -138,7 +138,8 @@ class TACACSAuthenticationReply:
     An authentication REPLY from the server.
 
     `status` is one of the TAC_PLUS_AUTHEN_STATUS_* values; `valid`,
-    `invalid`, `error`, `getuser`, `getpass` and `getdata` test for them.
+    `invalid`, `error`, `getuser`, `getpass`, `getdata`, `restart` and
+    `follow` test for them.  `invalid` is also true for RESTART and FOLLOW.
     `server_msg` is the server's message or prompt as bytes, `noecho` tells
     whether the answer to a prompt should be hidden, and `aborted` is set
     when the client ended the session instead of answering this reply.
@@ -210,7 +211,14 @@ class TACACSAuthenticationReply:
 
     @property
     def invalid(self):
-        return self.status == TAC_PLUS_AUTHEN_STATUS_FAIL
+        """
+        True for FAIL, and for RESTART and FOLLOW, which RFC 8907 says a client
+        that doesn't act on them must treat as FAIL.
+        """
+        return self.status in (
+            TAC_PLUS_AUTHEN_STATUS_FAIL, TAC_PLUS_AUTHEN_STATUS_RESTART,
+            TAC_PLUS_AUTHEN_STATUS_FOLLOW,
+        )
 
     @property
     def error(self):
@@ -227,6 +235,16 @@ class TACACSAuthenticationReply:
     @property
     def getuser(self):
         return self.status == TAC_PLUS_AUTHEN_STATUS_GETUSER
+
+    @property
+    def restart(self):
+        """True for RESTART: the server doesn't accept this ``authen_type``."""
+        return self.status == TAC_PLUS_AUTHEN_STATUS_RESTART
+
+    @property
+    def follow(self):
+        """True for FOLLOW ("ask another server", deprecated by RFC 8907)."""
+        return self.status == TAC_PLUS_AUTHEN_STATUS_FOLLOW
 
     @property
     def noecho(self):
