@@ -40,3 +40,9 @@ reference is built from the docstrings.
    api/replies
    api/tls
    api/internals
+
+.. toctree::
+   :caption: Project
+   :maxdepth: 1
+
+   about
