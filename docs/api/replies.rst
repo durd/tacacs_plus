@@ -1,5 +1,3 @@
-:hide-toc:
-
 Replies and errors
 ==================
 

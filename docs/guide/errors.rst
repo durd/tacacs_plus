@@ -1,5 +1,3 @@
-:hide-toc:
-
 Errors and timeouts
 ===================
 

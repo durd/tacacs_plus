@@ -27,9 +27,9 @@ in and changes passwords with this library.
   document constructor arguments in `__init__` (`autoclass_content = 'both'`). A new
   public module or class needs an entry in `docs/api/`. Examples live in `docs/guide/`,
   one short page per topic, in Sync/Async tabs (sphinx-design `tab-set` with
-  `:sync-group: client`) that should stay in step with each other. Pages start with
-  `:hide-toc:`: the left menu (the toctrees in `docs/index.rst`) is the only menu, so a
-  new page must be added there, and Furo shows `.. contents::` as an error.
+  `:sync-group: client`) that should stay in step with each other. The left menu lists
+  pages (the toctrees in `docs/index.rst`; add new pages there), Furo's right-hand menu
+  lists the current page's sections. Don't add `.. contents::`: Furo shows it as an error.
 - Logging calls pass their arguments (`logger.debug('sent <%s>', body)`), never
   f-strings or `%`/`.format()`; ruff's `G` rules check this. Everywhere else, use f-strings.
 - Every session (one TCP connection) starts with `_new_session()`: a new session_id from
