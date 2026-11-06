@@ -3,34 +3,27 @@ import secrets
 import select
 import logging
 import contextlib
-import re
-from hashlib import md5
 
 
 from .flags import (
     TAC_PLUS_MAJOR_VER, TAC_PLUS_MINOR_VER, TAC_PLUS_PRIV_LVL_MIN,
-    TAC_PLUS_AUTHEN_TYPE_CHAP, TAC_PLUS_MINOR_VER_ONE, TAC_PLUS_AUTHEN_TYPE_PAP,
+    TAC_PLUS_AUTHEN_TYPE_CHAP, TAC_PLUS_AUTHEN_TYPE_PAP,
     TAC_PLUS_AUTHEN, TAC_PLUS_AUTHEN_TYPE_ASCII, TAC_PLUS_AUTHEN_METH_TACACSPLUS,
     TAC_PLUS_AUTHOR, TAC_PLUS_AUTHOR_STATUS_FAIL, TAC_PLUS_PRIV_LVL_MAX,
     TAC_PLUS_ACCT, TAC_PLUS_VIRTUAL_REM_ADDR, TAC_PLUS_VIRTUAL_PORT,
     TAC_PLUS_CONTINUE_FLAG_ABORT, TAC_PLUS_AUTHEN_CHPASS
 )
+from .authen_dialog import AuthenDialog, start_data
 from .exceptions import TACACSProtocolError
 from .packet import TACACSPacket, TACACSHeader
 from .authentication import (
-    TACACSAuthenticationStart, TACACSAuthenticationContinue, TACACSAuthenticationReply,
-    to_bytes
+    TACACSAuthenticationStart, TACACSAuthenticationContinue, TACACSAuthenticationReply
 )
 from .authorization import TACACSAuthorizationStart, TACACSAuthorizationReply
 from .accounting import TACACSAccountingStart, TACACSAccountingReply
 
 logger = logging.getLogger(__name__)
 
-# prompt texts in GETPASS/GETDATA replies, see TACACSClient._prompt_kind
-PASSWORD_PROMPT = re.compile(r'pass|secret|\bpin\b', re.I)
-NEW_PASSWORD_PROMPT = re.compile(r'\bnew\b|confirm|re-?enter|re-?type|again|verify', re.I)
-OLD_PASSWORD_PROMPT = re.compile(r'\bold\b|current|existing', re.I)
-USER_PROMPT = re.compile(r'user|login', re.I)
 
 
 class TACACSClient:
@@ -194,11 +187,6 @@ class TACACSClient:
             data += chunk
         return data
 
-    # how often each kind of answer is sent before the client gives up on the
-    # dialog: the password twice (login, then an explicit "old password" when
-    # it must be changed), the new password twice (new + confirmation)
-    ANSWER_LIMITS = {'user': 1, 'old': 2, 'new': 2}
-
     def authenticate(self, username, password=None, priv_lvl=TAC_PLUS_PRIV_LVL_MIN,
                      authen_type=TAC_PLUS_AUTHEN_TYPE_ASCII,
                      chap_ppp_id=None, chap_challenge=None,
@@ -210,7 +198,7 @@ class TACACSClient:
 
         With TAC_PLUS_AUTHEN_TYPE_ASCII the server leads a dialog of
         GETUSER/GETPASS/GETDATA replies, which are answered from `username`,
-        `password` and `new_password` (see `_authen_dialog`).  When an answer
+        `password` and `new_password` (see AuthenDialog).  When an answer
         is missing, `prompt` is asked; without `prompt` the client aborts the
         session and returns the unanswered reply with `reply.aborted` set, so
         the caller can collect the answer (e.g. a new password) and retry.
@@ -240,42 +228,16 @@ class TACACSClient:
                                for a reply that isn't TACACS+),
                                ValueError
         """
-        start_data = b''
-        version_min = None
-        if authen_type in (TAC_PLUS_AUTHEN_TYPE_PAP,
-                           TAC_PLUS_AUTHEN_TYPE_CHAP):
-            version_min = TAC_PLUS_MINOR_VER_ONE
-            if not password and prompt is not None:
-                password = prompt(f'password for {username}: ', False)
-            if not password:
-                raise ValueError('a password is required for PAP and CHAP')
-
-            if authen_type == TAC_PLUS_AUTHEN_TYPE_PAP:
-                start_data = to_bytes(password, encoding)
-
-            if authen_type == TAC_PLUS_AUTHEN_TYPE_CHAP:
-                if not isinstance(chap_ppp_id, str):
-                    raise ValueError('chap_ppp_id must be a string')
-                if len(chap_ppp_id) != 1:
-                    raise ValueError('chap_ppp_id must be a 1-byte string')
-                if not isinstance(chap_challenge, str):
-                    raise ValueError('chap_challenge must be a string')
-                if len(chap_challenge) > 255:
-                    raise ValueError('chap_challenge may not be more 255 bytes')
-                start_data = (
-                    to_bytes(chap_ppp_id) +
-                    to_bytes(chap_challenge) +
-                    md5(
-                        to_bytes(chap_ppp_id) +
-                        to_bytes(password, encoding) +
-                        to_bytes(chap_challenge)
-                    ).digest()
-                )
+        if (authen_type in (TAC_PLUS_AUTHEN_TYPE_PAP, TAC_PLUS_AUTHEN_TYPE_CHAP)
+                and not password and prompt is not None):
+            password = prompt(f'password for {username}: ', False)
+        data, version_min = start_data(authen_type, password, chap_ppp_id,
+                                       chap_challenge, encoding)
         self._new_session(version_min)
         with self.closing():
             packet = self.send(
                 TACACSAuthenticationStart(username, authen_type, priv_lvl,
-                                          start_data, rem_addr=rem_addr, port=port,
+                                          data, rem_addr=rem_addr, port=port,
                                           encoding=encoding),
                 TAC_PLUS_AUTHEN
             )
@@ -335,27 +297,18 @@ class TACACSClient:
                        prompt, max_steps, encoding):
         """
         Answer GETUSER/GETPASS/GETDATA replies until the server ends the
-        dialog (PASS, FAIL, ERROR, ...), or abort it.
-
-        Each reply is answered with the username, the (old) password or the
-        new password, see `_prompt_kind`.  Each kind is sent at most
-        ANSWER_LIMITS times.  When no answer is known and `prompt` gives none,
-        or after `max_steps` CONTINUE packets, the client sends a CONTINUE with
+        dialog (PASS, FAIL, ERROR, ...), or abort it: see AuthenDialog.  When
+        no answer is known and `prompt` gives none, or after `max_steps`
+        CONTINUE packets, the client sends a CONTINUE with
         TAC_PLUS_CONTINUE_FLAG_ABORT and returns the unanswered reply with
         `aborted` set.
         """
-        values = {'user': username, 'old': password, 'new': new_password}
-        sent = {'user': 0, 'old': 0, 'new': 0}
-        steps = 0
-        while reply.getuser or reply.getpass or reply.getdata:
-            server_msg = reply.server_msg.decode(encoding, 'replace')
-            kind = self._prompt_kind(reply, server_msg, sent)
-            answer = None
-            if kind and sent[kind] < self.ANSWER_LIMITS[kind]:
-                answer = values[kind]
-            if answer is None and prompt is not None and steps < max_steps:
-                answer = prompt(server_msg, not reply.noecho)
-            if answer is None or steps >= max_steps:
+        dialog = AuthenDialog(username, password, new_password, max_steps, encoding)
+        while dialog.asks(reply):
+            kind, answer = dialog.known_answer(reply)
+            if answer is None and prompt is not None and dialog.steps_left:
+                answer = prompt(dialog.server_msg(reply), not reply.noecho)
+            if answer is None or not dialog.steps_left:
                 self.send(
                     TACACSAuthenticationContinue(
                         '', flags=TAC_PLUS_CONTINUE_FLAG_ABORT),
@@ -366,9 +319,7 @@ class TACACSClient:
                 reply.aborted = True
                 break
 
-            if kind:
-                sent[kind] += 1
-            steps += 1
+            dialog.answered(kind)
             packet = self.send(
                 TACACSAuthenticationContinue(answer, encoding=encoding),
                 TAC_PLUS_AUTHEN,
@@ -377,29 +328,7 @@ class TACACSClient:
             reply = self._authen_reply(packet)
         return reply
 
-    @staticmethod
-    def _prompt_kind(reply, server_msg, sent):
-        """
-        Guess what the server asks for: 'user', 'old' (the current password),
-        'new' (a new password or its confirmation) or None (unknown).
-
-        Password prompts are told apart by their text ("new", "confirm",
-        "old", ...); when the text doesn't say, the first one is the current
-        password and later ones the new password.
-        """
-        if reply.getuser:
-            return 'user'
-        if reply.getpass or reply.noecho or PASSWORD_PROMPT.search(server_msg):
-            if NEW_PASSWORD_PROMPT.search(server_msg):
-                return 'new'
-            if OLD_PASSWORD_PROMPT.search(server_msg):
-                return 'old'
-            return 'old' if not sent['old'] else 'new'
-        if USER_PROMPT.search(server_msg):
-            return 'user'
-        return None
-
-    def authorize(self, username, arguments=[],
+    def authorize(self, username, arguments=None,
                   authen_type=TAC_PLUS_AUTHEN_TYPE_ASCII, priv_lvl=TAC_PLUS_PRIV_LVL_MIN,
                   rem_addr=TAC_PLUS_VIRTUAL_REM_ADDR, port=TAC_PLUS_VIRTUAL_PORT):
         """
@@ -425,7 +354,7 @@ class TACACSClient:
             packet = self.send(
                 TACACSAuthorizationStart(username,
                                          TAC_PLUS_AUTHEN_METH_TACACSPLUS,
-                                         priv_lvl, authen_type, arguments,
+                                         priv_lvl, authen_type, arguments or [],
                                          rem_addr=rem_addr, port=port),
                 TAC_PLUS_AUTHOR
             )
@@ -443,7 +372,7 @@ class TACACSClient:
                 reply.status = TAC_PLUS_AUTHOR_STATUS_FAIL
         return reply
 
-    def account(self, username, flags, arguments=[],
+    def account(self, username, flags, arguments=None,
                 authen_type=TAC_PLUS_AUTHEN_TYPE_ASCII, priv_lvl=TAC_PLUS_PRIV_LVL_MIN,
                 rem_addr=TAC_PLUS_VIRTUAL_REM_ADDR, port=TAC_PLUS_VIRTUAL_PORT):
         """
@@ -470,7 +399,7 @@ class TACACSClient:
             packet = self.send(
                 TACACSAccountingStart(username, flags,
                                       TAC_PLUS_AUTHEN_METH_TACACSPLUS,
-                                      priv_lvl, authen_type, arguments,
+                                      priv_lvl, authen_type, arguments or [],
                                       rem_addr=rem_addr, port=port),
                 TAC_PLUS_ACCT
             )

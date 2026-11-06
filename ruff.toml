@@ -1,4 +1,6 @@
 target-version = "py310"
+# the CLI script has no .py extension
+extend-include = ["bin/tacacs_client"]
 
 # Rules that point at bugs: syntax errors, pyflakes (undefined names,
 # unused imports, ...) and a few pycodestyle errors; pyupgrade so Python 2
