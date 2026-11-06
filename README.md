@@ -195,7 +195,7 @@ user for answers the client doesn't have; `tacacs_client` does that.
 ### Development
 
 ```
-$ pip install -e . pytest pytest-cov pytest-asyncio ruff
+$ pip install -e . -r requirements-dev.txt
 $ pytest
 $ ruff check . bin/tacacs_client tacacs_client
 ```
