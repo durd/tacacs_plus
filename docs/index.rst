@@ -21,6 +21,12 @@ reference is built from the docstrings.
    print(reply.human_status, reply.server_msg)
 
 .. toctree::
+   :caption: Project
+   :maxdepth: 1
+
+   about
+
+.. toctree::
    :caption: Guide
    :maxdepth: 1
 
@@ -40,9 +46,3 @@ reference is built from the docstrings.
    api/replies
    api/tls
    api/internals
-
-.. toctree::
-   :caption: Project
-   :maxdepth: 1
-
-   about
