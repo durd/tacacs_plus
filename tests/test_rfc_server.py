@@ -129,3 +129,42 @@ def test_cli():
         assert bad.returncode == 1 and 'status: FAIL' in bad.stdout
     finally:
         srv.close()
+
+
+def test_new_session_id_per_session(server, encoding):
+    """Reusing a session_id repeats the obfuscation pad (RFC 8907 4.5)."""
+    c = client(server)
+    c.authenticate('alice', 'wrong', encoding=encoding)
+    c.authenticate('bob', 'expired', encoding=encoding)
+    c.change_password('alice', 'wrong', 'x', encoding=encoding)
+    ids = [r['session_id'] for r in server.requests]
+    assert len(ids) == 3 and len(set(ids)) == 3
+
+
+def test_fixed_session_id(server):
+    c = TACACSClient('127.0.0.1', server.port, SECRET, timeout=5, session_id=42)
+    c.authenticate('alice', 'wrong')
+    c.authenticate('alice', 'wrong')
+    assert [r['session_id'] for r in server.requests] == [(42).to_bytes(4, 'big')] * 2
+
+
+def test_minor_version_per_session(server):
+    """PAP/CHAP use minor version 1; it must not stick for later sessions."""
+    c = client(server)
+    c.authenticate('alice', 'x', authen_type=TAC_PLUS_AUTHEN_TYPE_PAP)
+    c.authenticate('alice', 'x')
+    c.change_password('alice', 'x', 'y')
+    assert [r['version'] for r in server.requests] == [0xc1, 0xc0, 0xc0]
+
+
+@pytest.mark.asyncio
+async def test_async_new_session_per_session():
+    srv = TacacsServer(SECRET, {'alice': 'secret'})
+    try:
+        cli = AsyncTACACSClient('127.0.0.1', srv.port, SECRET, timeout=5)
+        await cli.authenticate('alice', 'secret', authen_type=TAC_PLUS_AUTHEN_TYPE_PAP)
+        await cli.authenticate('alice', 'secret')
+        assert len({r['session_id'] for r in srv.requests}) == 2
+        assert [r['version'] for r in srv.requests] == [0xc1, 0xc0]
+    finally:
+        srv.close()

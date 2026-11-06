@@ -1,5 +1,5 @@
-import random
 import socket
+import secrets
 import select
 import logging
 import contextlib
@@ -51,8 +51,9 @@ class TACACSClient:
         :param secret:      the secret key used to obfuscate packet bodies; can
                             be `None` to disable packet body obfuscation
         :param timeout:     seconds to wait for the connection and each reply
-        :param session_id:  a unique 32-bit int representing the session; if
-                            left empty, one will be auto-generated
+        :param session_id:  a 32-bit int used as session_id for every
+                            session; leave it empty (the default) so each
+                            session gets a new random one
         :param family:      socket.AF_INET or socket.AF_INET6
         :param version_max: TACACS+ major version number, 12
         :param version_min: TACACS+ minor version number, 0 or 1
@@ -66,12 +67,28 @@ class TACACSClient:
         self.version_min = version_min
         self.family = family
 
-        # session_id is an unsigned 32-bit int; unless it's provided, randomize
-        self.session_id = session_id or random.randint(1, 2 ** 32 - 1)
+        # the minor version for sessions other than PAP/CHAP authentication
+        self._version_min = version_min
+        self._session_id = session_id
+        self._new_session()
 
     @property
     def version(self):
         return (self.version_max * 0x10) + self.version_min
+
+    def _new_session(self, version_min=None):
+        """
+        Prepare a new session (one connection): a new session_id and the
+        minor version, so nothing carries over from an earlier session.
+
+        RFC 8907 (section 4.1) wants a cryptographically random session_id.
+        It also matters for security: the obfuscation pad depends only on
+        session_id, secret, version and seq_no (section 4.5), so two sessions
+        with the same session_id get the same pad, and XOR-ing their packets
+        cancels it.  A session_id given to __init__ is used for every session.
+        """
+        self.session_id = self._session_id or secrets.randbelow(2 ** 32 - 1) + 1
+        self.version_min = self._version_min if version_min is None else version_min
 
     @property
     def sock(self):
@@ -224,9 +241,10 @@ class TACACSClient:
                                ValueError
         """
         start_data = b''
+        version_min = None
         if authen_type in (TAC_PLUS_AUTHEN_TYPE_PAP,
                            TAC_PLUS_AUTHEN_TYPE_CHAP):
-            self.version_min = TAC_PLUS_MINOR_VER_ONE
+            version_min = TAC_PLUS_MINOR_VER_ONE
             if not password and prompt is not None:
                 password = prompt(f'password for {username}: ', False)
             if not password:
@@ -253,6 +271,7 @@ class TACACSClient:
                         to_bytes(chap_challenge)
                     ).digest()
                 )
+        self._new_session(version_min)
         with self.closing():
             packet = self.send(
                 TACACSAuthenticationStart(username, authen_type, priv_lvl,
@@ -292,6 +311,7 @@ class TACACSClient:
         :raises:               TimeoutError, OSError (TACACSProtocolError
                                for a reply that isn't TACACS+)
         """
+        self._new_session()
         with self.closing():
             packet = self.send(
                 TACACSAuthenticationStart(username, TAC_PLUS_AUTHEN_TYPE_ASCII,
@@ -400,6 +420,7 @@ class TACACSClient:
         :raises:               TimeoutError, OSError (TACACSProtocolError
                                for a reply that isn't TACACS+)
         """
+        self._new_session()
         with self.closing():
             packet = self.send(
                 TACACSAuthorizationStart(username,
@@ -444,6 +465,7 @@ class TACACSClient:
         :raises:               TimeoutError, OSError (TACACSProtocolError
                                for a reply that isn't TACACS+)
         """
+        self._new_session()
         with self.closing():
             packet = self.send(
                 TACACSAccountingStart(username, flags,

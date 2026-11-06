@@ -7,7 +7,7 @@ from .flags import (
     TAC_PLUS_AUTHEN_STATUS_GETPASS, TAC_PLUS_VIRTUAL_PORT, TAC_PLUS_VIRTUAL_REM_ADDR,
     TAC_PLUS_AUTHEN_STATUS_GETDATA, TAC_PLUS_AUTHEN_STATUS_GETUSER,
     TAC_PLUS_AUTHEN_STATUS_RESTART, TAC_PLUS_AUTHEN_STATUS_FOLLOW,
-    TAC_PLUS_REPLY_FLAG_NOECHO
+    TAC_PLUS_REPLY_FLAG_NOECHO, TAC_PLUS_AUTHEN_TYPE_PAP, TAC_PLUS_AUTHEN_TYPE_CHAP
 )
 from .packet import to_bytes
 
@@ -67,12 +67,20 @@ class TACACSAuthenticationStart:
             body += struct.pack(f'{len(value)}s', value)
         return body
 
+    @property
+    def _data_for_log(self):
+        # PAP data is the password; CHAP data holds an MD5 of the password and
+        # the challenge, which can be brute-forced offline
+        if self.authen_type in (TAC_PLUS_AUTHEN_TYPE_PAP, TAC_PLUS_AUTHEN_TYPE_CHAP):
+            return '*' * len(self.data)
+        return self.data
+
     def __str__(self):
         return ', '.join([
             f'action: {self.action}',
             f'authen_type: {self.authen_type}',
             f'authen_service: {self.service}',
-            f'data: {self.data}',
+            f'data: {self._data_for_log}',
             f'data_len: {len(self.data)}',
             f'priv_lvl: {self.priv_lvl}',
             f'port: {self.port}',

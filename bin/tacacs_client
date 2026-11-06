@@ -76,8 +76,8 @@ def parse_args():
 
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
-        log.warning("\033[93mTACACS+ --debug will log raw packet data INCLUDING PASSWORDS;"
-                 "proceed at your own risk!\033[00m")
+        log.warning("\033[93mTACACS+ --debug logs packet contents: usernames, AV pairs and server"
+                    " messages (passwords are masked)\033[00m")
 
     if tacacs_key:
         args.key = tacacs_key
