@@ -277,3 +277,28 @@ async def test_async_authorize_and_account(aaa_server):
     reply = await cli.authorize('alice', arguments=[b'service=shell'])
     assert reply.valid and b'role=admin' in reply.arguments
     assert (await cli.account('alice', TAC_PLUS_ACCT_FLAG_START, arguments=[b'task_id=1'])).valid
+
+
+@pytest.mark.parametrize('call', ['authenticate', 'authorize', 'account'])
+def test_wrong_secret_is_a_protocol_error(aaa_server, call):
+    """The reply de-obfuscates to garbage; that used to come back as e.g. status 'UNKNOWN: 151'."""
+    from tacacs_plus.exceptions import TACACSProtocolError
+    from tacacs_plus.flags import TAC_PLUS_ACCT_FLAG_START
+    cli = TACACSClient('127.0.0.1', aaa_server.port, 'not-the-secret', timeout=5)
+    for _ in range(20):  # each session's garbage is different
+        with pytest.raises(TACACSProtocolError, match='wrong shared secret'):
+            if call == 'authenticate':
+                cli.authenticate('alice', 'secret')
+            elif call == 'authorize':
+                cli.authorize('alice', arguments=[b'service=shell'])
+            else:
+                cli.account('alice', TAC_PLUS_ACCT_FLAG_START, arguments=[b'task_id=1'])
+
+
+@pytest.mark.asyncio
+async def test_async_wrong_secret_is_a_protocol_error(aaa_server):
+    from tacacs_plus.exceptions import TACACSProtocolError
+    cli = AsyncTACACSClient('127.0.0.1', aaa_server.port, 'not-the-secret', timeout=5)
+    for _ in range(20):
+        with pytest.raises(TACACSProtocolError, match='wrong shared secret'):
+            await cli.authenticate('alice', 'secret')

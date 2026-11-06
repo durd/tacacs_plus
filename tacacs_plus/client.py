@@ -333,7 +333,7 @@ class TACACSClient:
         return reply
 
     def _authen_reply(self, packet):
-        reply = TACACSAuthenticationReply.unpacked(packet.body)
+        reply = TACACSAuthenticationReply.unpacked(packet.body, strict=True)
         logger.debug('%s\nrecv header <%s>\nrecv body <%s>',
                      reply.__class__.__name__, packet.header, reply)
         return reply
@@ -409,7 +409,7 @@ class TACACSClient:
                                          rem_addr=rem_addr, port=port),
                 TAC_PLUS_AUTHOR
             )
-            reply = TACACSAuthorizationReply.unpacked(packet.body)
+            reply = TACACSAuthorizationReply.unpacked(packet.body, strict=True)
             logger.debug('%s\nrecv header <%s>\nrecv body <%s>',
                          reply.__class__.__name__, packet.header, reply)
             reply_arguments = dict([
@@ -462,7 +462,7 @@ class TACACSClient:
                                       rem_addr=rem_addr, port=port),
                 TAC_PLUS_ACCT
             )
-            reply = TACACSAccountingReply.unpacked(packet.body)
+            reply = TACACSAccountingReply.unpacked(packet.body, strict=True)
             logger.debug('%s\nrecv header <%s>\nrecv body <%s>',
                          reply.__class__.__name__, packet.header, reply)
         return reply

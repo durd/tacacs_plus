@@ -6,7 +6,7 @@ from .flags import (
     TAC_PLUS_ACCT_STATUS_ERROR, TAC_PLUS_ACCT_STATUS_FOLLOW,
     TAC_PLUS_VIRTUAL_PORT, TAC_PLUS_VIRTUAL_REM_ADDR
 )
-from .packet import to_bytes
+from .packet import check_reply, to_bytes
 
 
 class TACACSAccountingStart:
@@ -98,8 +98,17 @@ class TACACSAccountingReply:
         self.flags = None
         self.arguments = []
 
+    STATUSES = (
+        TAC_PLUS_ACCT_STATUS_SUCCESS, TAC_PLUS_ACCT_STATUS_ERROR, TAC_PLUS_ACCT_STATUS_FOLLOW,
+    )
+
     @classmethod
-    def unpacked(cls, raw):
+    def unpacked(cls, raw, strict=False):
+        """
+        Parse a reply body.  With `strict`, raise TACACSProtocolError for a
+        body that doesn't add up or has an unknown status, e.g. because the
+        shared secret is wrong; the clients always use strict.
+        """
         #  1 2 3 4 5 6 7 8  1 2 3 4 5 6 7 8  1 2 3 4 5 6 7 8  1 2 3 4 5 6 7 8
         # +----------------+----------------+----------------+----------------+
         # |         server_msg len          |            data_len             |
@@ -111,9 +120,15 @@ class TACACSAccountingReply:
 
         # B = unsigned char
         # !H = network-order (big-endian) unsigned short
+        if strict and len(raw) < 5:
+            check_reply('accounting reply', None, (), 5, len(raw))
+        body_length = len(raw)
         raw = io.BytesIO(raw)
         server_msg_len, data_len = struct.unpack('!HH', raw.read(4))
         status = struct.unpack('B', raw.read(1))[0]
+        if strict:
+            check_reply('accounting reply', status, cls.STATUSES,
+                        5 + server_msg_len + data_len, body_length)
         server_msg = raw.read(server_msg_len)
         data = raw.read(data_len) if data_len else b''
         return cls(status, server_msg, data)

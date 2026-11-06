@@ -2,6 +2,8 @@ import io
 import struct
 from hashlib import md5
 
+from .exceptions import TACACSProtocolError
+
 
 def to_bytes(value, encoding='latin-1'):
     """
@@ -12,6 +14,24 @@ def to_bytes(value, encoding='latin-1'):
     if isinstance(value, bytes):
         return value
     return value.encode(encoding)
+
+
+def check_reply(name, status, statuses, expected_length, length):
+    """
+    Raise TACACSProtocolError unless a reply's status is one of `statuses`
+    and the body has the `expected_length` its length fields add up to.
+    Extra bytes at the end are allowed.
+
+    A wrong shared secret usually shows here: the server's reply
+    de-obfuscates to random bytes, with length fields far too large.
+    """
+    if length < expected_length:
+        raise TACACSProtocolError(
+            f'garbled {name}: its length fields add up to {expected_length} bytes, '
+            f'the body has only {length} (wrong shared secret?)')
+    if status not in statuses:
+        raise TACACSProtocolError(
+            f'garbled {name}: unknown status {status} (wrong shared secret?)')
 
 
 def crypt(header, body_bytes, secret):

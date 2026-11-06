@@ -331,3 +331,36 @@ def test_start_str_masks_pap_and_chap_data(authen_type):
 
 def test_start_str_shows_ascii_data():
     assert 'abc' in str(TACACSAuthenticationStart('user', 1, data=b'abc'))
+
+
+@pytest.mark.parametrize('raw, problem', [
+    (struct.pack('!BBHH', 1, 0, 0, 0)[:4], 'only 4'),                        # too short
+    (struct.pack('!BBHH', 1, 0, 300, 0) + b'abc', 'add up to 306'),         # lengths too large
+    (struct.pack('!BBHH', 151, 0, 0, 0), 'unknown status 151'),            # no such status
+])
+def test_strict_reply_parsing(raw, problem):
+    with pytest.raises(TACACSProtocolError, match=problem):
+        TACACSAuthenticationReply.unpacked(raw, strict=True)
+
+
+def test_strict_reply_parsing_allows_trailing_bytes():
+    reply = TACACSAuthenticationReply.unpacked(struct.pack('!BBHH', 1, 0, 2, 0) + b'ok\x00', strict=True)
+    assert reply.valid and reply.server_msg == b'ok'
+
+
+def test_lenient_reply_parsing_is_unchanged():
+    assert TACACSAuthenticationReply.unpacked(struct.pack('!BBHH', 151, 0, 0, 0)).status == 151
+
+
+@pytest.mark.parametrize('cls, raw', [
+    ('authorization', struct.pack('!BBHH', 1, 1, 0, 0) + b'\x09' + b'priv-lvl'),       # arg 1 byte short
+    ('authorization', struct.pack('!BBHH', 99, 0, 0, 0)),
+    ('accounting', struct.pack('!HHB', 50, 0, 1)),
+    ('accounting', struct.pack('!HHB', 0, 0, 77)),
+])
+def test_strict_author_and_acct_parsing(cls, raw):
+    from tacacs_plus.accounting import TACACSAccountingReply
+    from tacacs_plus.authorization import TACACSAuthorizationReply
+    reply_cls = TACACSAuthorizationReply if cls == 'authorization' else TACACSAccountingReply
+    with pytest.raises(TACACSProtocolError, match='garbled'):
+        reply_cls.unpacked(raw, strict=True)

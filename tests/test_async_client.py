@@ -377,7 +377,7 @@ async def test_authorize_equal_priv_lvl(patch_connection, packets):
 
 @pytest.mark.parametrize(
     'packets',
-    [AUTHORIZE_HEADER + b'\x11\x01\x01\x00\x00\x00\x00\x0bpriv-lvl=1'],
+    [AUTHORIZE_HEADER + b'\x11\x01\x01\x00\x00\x00\x00\x0apriv-lvl=1'],
 )
 @pytest.mark.asyncio
 async def test_authorize_lesser_priv_lvl(patch_connection, packets):
