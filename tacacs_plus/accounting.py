@@ -1,15 +1,15 @@
+import io
 import struct
-
-import six
 
 from .flags import (
     TAC_PLUS_AUTHEN_SVC_LOGIN, TAC_PLUS_ACCT_STATUS_SUCCESS,
     TAC_PLUS_ACCT_STATUS_ERROR, TAC_PLUS_ACCT_STATUS_FOLLOW,
     TAC_PLUS_VIRTUAL_PORT, TAC_PLUS_VIRTUAL_REM_ADDR
 )
+from .packet import to_bytes
 
 
-class TACACSAccountingStart(object):
+class TACACSAccountingStart:
 
     def __init__(self, username, flags, authen_method, priv_lvl, authen_type,
                  arguments, rem_addr=TAC_PLUS_VIRTUAL_REM_ADDR,
@@ -48,9 +48,9 @@ class TACACSAccountingStart(object):
         # +----------------+----------------+----------------+----------------+
         # |   arg_N ...
         # +----------------+----------------+----------------+----------------+
-        username = six.b(self.username)
-        rem_addr = six.b(self.rem_addr)
-        port = six.b(self.port)
+        username = to_bytes(self.username)
+        rem_addr = to_bytes(self.rem_addr)
+        port = to_bytes(self.port)
         arguments = self.arguments
         body = struct.pack(
             'B' * 9,
@@ -90,7 +90,7 @@ class TACACSAccountingStart(object):
         ])
 
 
-class TACACSAccountingReply(object):
+class TACACSAccountingReply:
     def __init__(self, status, server_msg, data):
         self.status = status
         self.server_msg = server_msg
@@ -111,7 +111,7 @@ class TACACSAccountingReply(object):
 
         # B = unsigned char
         # !H = network-order (big-endian) unsigned short
-        raw = six.BytesIO(raw)
+        raw = io.BytesIO(raw)
         server_msg_len, data_len = struct.unpack('!HH', raw.read(4))
         status = struct.unpack('B', raw.read(1))[0]
         server_msg = raw.read(server_msg_len)

@@ -134,9 +134,9 @@ async def test_client_socket_send_wrong_headers(patch_connection, packets):
     'packets',
     [
         AUTHENTICATE_HEADER
-        + '\x10\x05\x01\x00\n\x00\x00Password: '.encode()
+        + b'\x10\x05\x01\x00\n\x00\x00Password: '
         + AUTHENTICATE_HEADER  # noqa getpass
-        + '\x06\x01\x00\x00\x00\x00\x00'.encode()  # auth_valid
+        + b'\x06\x01\x00\x00\x00\x00\x00'  # auth_valid
     ],
 )
 @pytest.mark.asyncio
@@ -198,7 +198,7 @@ async def test_authenticate_pap(patch_connection, packets):
     first_body = patch_connection.read(first_header.length)
     assert (
         TACACSAuthenticationStart(
-            'username', TAC_PLUS_AUTHEN_TYPE_PAP, data='pass'.encode()
+            'username', TAC_PLUS_AUTHEN_TYPE_PAP, data=b'pass'
         ).packed
         == first_body
     )

@@ -1,6 +1,5 @@
+import io
 import struct
-
-import six
 
 from .flags import (
     TAC_PLUS_PRIV_LVL_MIN, TAC_PLUS_AUTHEN_LOGIN, TAC_PLUS_AUTHEN_SVC_LOGIN,
@@ -10,23 +9,13 @@ from .flags import (
     TAC_PLUS_AUTHEN_STATUS_RESTART, TAC_PLUS_AUTHEN_STATUS_FOLLOW,
     TAC_PLUS_REPLY_FLAG_NOECHO
 )
+from .packet import to_bytes
 
 
-def to_bytes(value, encoding='latin-1'):
-    """
-    Encode text with `encoding`; bytes are passed through unchanged.
-
-    The default, latin-1, is what `six.b()` did before `encoding` existed.
-    """
-    if isinstance(value, six.binary_type):
-        return value
-    return value.encode(encoding)
-
-
-class TACACSAuthenticationStart(object):
+class TACACSAuthenticationStart:
 
     def __init__(self, username, authen_type, priv_lvl=TAC_PLUS_PRIV_LVL_MIN,
-                 data=six.b(''), rem_addr=TAC_PLUS_VIRTUAL_REM_ADDR,
+                 data=b'', rem_addr=TAC_PLUS_VIRTUAL_REM_ADDR,
                  port=TAC_PLUS_VIRTUAL_PORT, action=TAC_PLUS_AUTHEN_LOGIN,
                  encoding='latin-1'):
         self.username = username
@@ -95,8 +84,8 @@ class TACACSAuthenticationStart(object):
         ])
 
 
-class TACACSAuthenticationContinue(object):
-    def __init__(self, password, data=six.b(''), flags=0, encoding='latin-1'):
+class TACACSAuthenticationContinue:
+    def __init__(self, password, data=b'', flags=0, encoding='latin-1'):
         self.password = password
         self.data = data
         self.flags = flags
@@ -136,7 +125,7 @@ class TACACSAuthenticationContinue(object):
         ])
 
 
-class TACACSAuthenticationReply(object):
+class TACACSAuthenticationReply:
 
     def __init__(self, status, flags, server_msg, data):
         self.status = status
@@ -162,7 +151,7 @@ class TACACSAuthenticationReply(object):
 
         # B = unsigned char
         # !H = network-order (big-endian) unsigned short
-        raw = six.BytesIO(raw)
+        raw = io.BytesIO(raw)
         status, flags = struct.unpack('BB', raw.read(2))
         server_msg_len, data_len = struct.unpack('!HH', raw.read(4))
         server_msg = raw.read(server_msg_len)

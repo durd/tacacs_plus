@@ -7,7 +7,7 @@ import types
 from uuid import uuid4
 
 import pytest
-import six
+import io
 
 from tacacs_plus.flags import (
     TAC_PLUS_AUTHEN, TAC_PLUS_AUTHEN_TYPE_ASCII,
@@ -24,11 +24,11 @@ from tacacs_plus.authorization import TACACSAuthorizationStart, TACACSAuthorizat
 from tacacs_plus.accounting import TACACSAccountingStart, TACACSAccountingReply
 from tacacs_plus.client import TACACSClient
 
-AUTHENTICATE_HEADER = six.b('\xc0\x01\x01\x00\x00\x0009\x00\x00\x00')
-AUTHENTICATE_HEADER_V12_1 = six.b('\xc1\x01\x01\x00\x00\x0009\x00\x00\x00')
-AUTHENTICATE_HEADER_WRONG = six.b('\xf0\x01\x01\x00\x00\x0009\x00\x00\x00')
-AUTHORIZE_HEADER = six.b('\xc0\x02\x01\x00\x00\x0009\x00\x00\x00')
-ACCOUNT_HEADER = six.b('\xc0\x03\x01\x00\x00\x0009\x00\x00\x00')
+AUTHENTICATE_HEADER = b'\xc0\x01\x01\x00\x00\x0009\x00\x00\x00'
+AUTHENTICATE_HEADER_V12_1 = b'\xc1\x01\x01\x00\x00\x0009\x00\x00\x00'
+AUTHENTICATE_HEADER_WRONG = b'\xf0\x01\x01\x00\x00\x0009\x00\x00\x00'
+AUTHORIZE_HEADER = b'\xc0\x02\x01\x00\x00\x0009\x00\x00\x00'
+ACCOUNT_HEADER = b'\xc0\x03\x01\x00\x00\x0009\x00\x00\x00'
 
 
 @pytest.fixture
@@ -41,17 +41,17 @@ def fake_socket(tmpdir_factory, request):
     f = open(filename, 'w')
     request.addfinalizer(f.close)
 
-    sockobj = socket._socket.socket if six.PY3 else socket._socketobject
+    sockobj = socket._socket.socket
 
     class fakesocket(sockobj):
-        buff = six.BytesIO()
+        buff = io.BytesIO()
 
     def _send(self, data):
         self.buff.write(data)
         return len(data)  # number of bytes sent
 
     sock = fakesocket()
-    sock.f = six.BytesIO(packets)
+    sock.f = io.BytesIO(packets)
     # socket.socket overrides these at instantiation time to the underlying
     # C implementation; set them here so that we can mock send() and recv()
     # calls
@@ -132,36 +132,36 @@ def test_authentication_start_pack():
         username,
         TAC_PLUS_AUTHEN_TYPE_ASCII
     ).packed
-    assert packed == six.b(
-        '\x01'           # tacacs_plus.flags.TAC_PLUS_AUTHEN_LOGIN \
-        '\x00'           # tacacs_plus.flags.TAC_PLUS_PRIV_LVL_MIN \
-        '\x01'           # tacacs_plus.flags.TAC_PLUS_AUTHEN_TYPE_ASCII \
-        '\x01'           # tacacs_plus.flags.TAC_PLUS_AUTHEN_SVC_LOGIN \
-        '\x07'           # username_len == 7 \
-        '\x0b'           # port_len == 11 \
-        '\x0d'           # rem_addr_len == 13 \
-        '\x00'           # data_len == 0 \
-        'user123'        # username \
-        'python_tty0'    # port \
-        'python_device'  # rem_addr
+    assert packed == (
+        b'\x01'           # tacacs_plus.flags.TAC_PLUS_AUTHEN_LOGIN \
+        b'\x00'           # tacacs_plus.flags.TAC_PLUS_PRIV_LVL_MIN \
+        b'\x01'           # tacacs_plus.flags.TAC_PLUS_AUTHEN_TYPE_ASCII \
+        b'\x01'           # tacacs_plus.flags.TAC_PLUS_AUTHEN_SVC_LOGIN \
+        b'\x07'           # username_len == 7 \
+        b'\x0b'           # port_len == 11 \
+        b'\x0d'           # rem_addr_len == 13 \
+        b'\x00'           # data_len == 0 \
+        b'user123'        # username \
+        b'python_tty0'    # port \
+        b'python_device'  # rem_addr
     )
 
 
 def test_authentication_continue_pack():
     password = 'password'
     packed = TACACSAuthenticationContinue(password).packed
-    assert packed == six.b(
-        '\x00\x08'  # user_msg len (password length) \
-        '\x00\x00'  # data_len \
-        '\x00'      # flags \
-        'password'
+    assert packed == (
+        b'\x00\x08'  # user_msg len (password length) \
+        b'\x00\x00'  # data_len \
+        b'\x00'      # flags \
+        b'password'
     )
 
 
 @pytest.mark.parametrize('raw, state, human_status', [
-    (six.b('\x01\x00\x00\x00\x00\x00'), 'valid', 'PASS'),
-    (six.b('\x02\x00\x00\x00\x00\x00'), 'invalid', 'FAIL',),
-    (six.b('\x07\x00\x00\x00\x00\x00'), 'error', 'ERROR'),
+    (b'\x01\x00\x00\x00\x00\x00', 'valid', 'PASS'),
+    (b'\x02\x00\x00\x00\x00\x00', 'invalid', 'FAIL',),
+    (b'\x07\x00\x00\x00\x00\x00', 'error', 'ERROR'),
 ])
 def test_authentication_reply_unpack(raw, state, human_status):
     reply = TACACSAuthenticationReply.unpacked(raw)
@@ -171,10 +171,10 @@ def test_authentication_reply_unpack(raw, state, human_status):
 
 def test_authentication_reply_unpack_server_msg():
     reply = TACACSAuthenticationReply.unpacked(
-        six.b('\x05\x01\x00\n\x00\x00Password: ')
+        b'\x05\x01\x00\n\x00\x00Password: '
     )
     assert reply.getpass is True
-    assert reply.server_msg == six.b('Password: ')
+    assert reply.server_msg == b'Password: '
     assert reply.human_status == 'GETPASS'
 
 
@@ -186,33 +186,33 @@ def test_authorization_start_pack():
         TAC_PLUS_PRIV_LVL_MIN, TAC_PLUS_AUTHEN_TYPE_ASCII,
         [b"service=shell", b"cmd=show", b"cmdargs=version"],
     ).packed
-    assert packed == six.b(
-        '\x06'              # tacacs_plus.flags.TAC_PLUS_AUTHEN_METH_TACACSPLUS \
-        '\x00'              # tacacs_plus.flags.TAC_PLUS_PRIV_LVL_MIN \
-        '\x01'              # tacacs_plus.flags.TAC_PLUS_AUTHEN_TYPE_ASCII \
-        '\x01'              # tacacs_plus.flags.TAC_PLUS_AUTHEN_SVC_LOGIN \
-        '\x07'              # username_len == 7 \
-        '\x0b'              # port_len == 11 \
-        '\x0d'              # rem_addr_len == 13 \
-        '\x03'              # arg_len == 3
-        '\x0d'              # arg_1_len == 13 (service=shell) \
-        '\x08'              # arg_2_len == 8 (cmd=show) \
-        '\x0f'              # arg_3_len == 14 (cmdargs=version) \
-        'user123'           # username \
-        'python_tty0'       # port \
-        'python_device'     # rem_addr \
-        'service=shell'     # arg_1 (service=shell) \
-        'cmd=show'          # arg_2 (cmd=show) \
-        'cmdargs=version'   # arg_3 (cmdargs=version)
+    assert packed == (
+        b'\x06'              # tacacs_plus.flags.TAC_PLUS_AUTHEN_METH_TACACSPLUS \
+        b'\x00'              # tacacs_plus.flags.TAC_PLUS_PRIV_LVL_MIN \
+        b'\x01'              # tacacs_plus.flags.TAC_PLUS_AUTHEN_TYPE_ASCII \
+        b'\x01'              # tacacs_plus.flags.TAC_PLUS_AUTHEN_SVC_LOGIN \
+        b'\x07'              # username_len == 7 \
+        b'\x0b'              # port_len == 11 \
+        b'\x0d'              # rem_addr_len == 13 \
+        b'\x03'              # arg_len == 3
+        b'\x0d'              # arg_1_len == 13 (service=shell) \
+        b'\x08'              # arg_2_len == 8 (cmd=show) \
+        b'\x0f'              # arg_3_len == 14 (cmdargs=version) \
+        b'user123'           # username \
+        b'python_tty0'       # port \
+        b'python_device'     # rem_addr \
+        b'service=shell'     # arg_1 (service=shell) \
+        b'cmd=show'          # arg_2 (cmd=show) \
+        b'cmdargs=version'   # arg_3 (cmdargs=version)
     )
 
 
 @pytest.mark.parametrize('raw, state, human_status', [
-    (six.b('\x01\x00\x00\x00\x00\x00'), 'valid', 'PASS'),
-    (six.b('\x02\x00\x00\x00\x00\x00'), 'reply', 'REPL'),
-    (six.b('\x10\x00\x00\x00\x00\x00'), 'invalid', 'FAIL',),
-    (six.b('\x11\x00\x00\x00\x00\x00'), 'error', 'ERROR'),
-    (six.b('\x21\x00\x00\x00\x00\x00'), 'follow', 'FOLLOW'),
+    (b'\x01\x00\x00\x00\x00\x00', 'valid', 'PASS'),
+    (b'\x02\x00\x00\x00\x00\x00', 'reply', 'REPL'),
+    (b'\x10\x00\x00\x00\x00\x00', 'invalid', 'FAIL',),
+    (b'\x11\x00\x00\x00\x00\x00', 'error', 'ERROR'),
+    (b'\x21\x00\x00\x00\x00\x00', 'follow', 'FOLLOW'),
 ])
 def test_authorization_reply_unpack(raw, state, human_status):
     reply = TACACSAuthorizationReply.unpacked(raw)
@@ -222,23 +222,23 @@ def test_authorization_reply_unpack(raw, state, human_status):
 
 def test_authorization_reply_unpack_server_msg():
     reply = TACACSAuthorizationReply.unpacked(
-        six.b('\x01\x00\x08\x00\x00\x00amessage')
+        b'\x01\x00\x08\x00\x00\x00amessage'
     )
-    assert reply.server_msg == six.b('amessage')
+    assert reply.server_msg == b'amessage'
     assert 'amessage' in str(reply)
 
 
 def test_authorization_reply_unpack_data():
     reply = TACACSAuthorizationReply.unpacked(
-        six.b('\x01\x00\x00\x00\x08\x00adata')
+        b'\x01\x00\x00\x00\x08\x00adata'
     )
-    assert reply.data == six.b('adata')
+    assert reply.data == b'adata'
     assert 'adata' in str(reply)
 
 
 def test_authorization_reply_unpack_args():
     reply = TACACSAuthorizationReply.unpacked(
-        six.b('\x01\x02\x00\x00\x00\x00\x04\x04arg1arg2')
+        b'\x01\x02\x00\x00\x00\x00\x04\x04arg1arg2'
     )
     assert reply.arg_cnt == 2
     assert reply.arguments == [b'arg1', b'arg2']
@@ -252,32 +252,32 @@ def test_accounting_start_pack():
         TAC_PLUS_PRIV_LVL_MIN, TAC_PLUS_AUTHEN_TYPE_ASCII,
         [b"service=shell", b"cmd=show", b"cmdargs=version"],
     ).packed
-    assert packed == six.b(
-        '\x02'
-        '\x06'              # tacacs_plus.flags.TAC_PLUS_AUTHEN_METH_TACACSPLUS \
-        '\x00'              # tacacs_plus.flags.TAC_PLUS_PRIV_LVL_MIN \
-        '\x01'              # tacacs_plus.flags.TAC_PLUS_AUTHEN_TYPE_ASCII \
-        '\x01'              # tacacs_plus.flags.TAC_PLUS_AUTHEN_SVC_LOGIN \
-        '\x07'              # username_len == 7 \
-        '\x0b'              # port_len == 11 \
-        '\x0d'              # rem_addr_len == 13 \
-        '\x03'              # arg_len == 3
-        '\x0d'              # arg_1_len == 13 (service=shell) \
-        '\x08'              # arg_2_len == 8 (cmd=show) \
-        '\x0f'              # arg_3_len == 14 (cmdargs=version) \
-        'user123'           # username \
-        'python_tty0'       # port \
-        'python_device'     # rem_addr \
-        'service=shell'     # arg_1 (service=shell) \
-        'cmd=show'          # arg_2 (cmd=show) \
-        'cmdargs=version'   # arg_3 (cmdargs=version)
+    assert packed == (
+        b'\x02'
+        b'\x06'              # tacacs_plus.flags.TAC_PLUS_AUTHEN_METH_TACACSPLUS \
+        b'\x00'              # tacacs_plus.flags.TAC_PLUS_PRIV_LVL_MIN \
+        b'\x01'              # tacacs_plus.flags.TAC_PLUS_AUTHEN_TYPE_ASCII \
+        b'\x01'              # tacacs_plus.flags.TAC_PLUS_AUTHEN_SVC_LOGIN \
+        b'\x07'              # username_len == 7 \
+        b'\x0b'              # port_len == 11 \
+        b'\x0d'              # rem_addr_len == 13 \
+        b'\x03'              # arg_len == 3
+        b'\x0d'              # arg_1_len == 13 (service=shell) \
+        b'\x08'              # arg_2_len == 8 (cmd=show) \
+        b'\x0f'              # arg_3_len == 14 (cmdargs=version) \
+        b'user123'           # username \
+        b'python_tty0'       # port \
+        b'python_device'     # rem_addr \
+        b'service=shell'     # arg_1 (service=shell) \
+        b'cmd=show'          # arg_2 (cmd=show) \
+        b'cmdargs=version'   # arg_3 (cmdargs=version)
     )
 
 
 @pytest.mark.parametrize('raw, state, human_status', [
-    (six.b('\x00\x00\x00\x00\x01\x00\x00'), 'valid', 'SUCCESS'),
-    (six.b('\x00\x00\x00\x00\x02\x00\x00'), 'error', 'ERROR'),
-    (six.b('\x00\x00\x00\x00\x21\x00\x00'), 'follow', 'FOLLOW'),
+    (b'\x00\x00\x00\x00\x01\x00\x00', 'valid', 'SUCCESS'),
+    (b'\x00\x00\x00\x00\x02\x00\x00', 'error', 'ERROR'),
+    (b'\x00\x00\x00\x00\x21\x00\x00', 'follow', 'FOLLOW'),
 ])
 def test_accounting_reply_unpack(raw, state, human_status):
     reply = TACACSAccountingReply.unpacked(raw)
@@ -287,17 +287,17 @@ def test_accounting_reply_unpack(raw, state, human_status):
 
 def test_accounting_reply_unpack_server_msg():
     reply = TACACSAccountingReply.unpacked(
-        six.b('\x08\x00\x00\x00\x01amessage')
+        b'\x08\x00\x00\x00\x01amessage'
     )
-    assert reply.server_msg == six.b('amessage')
+    assert reply.server_msg == b'amessage'
     assert 'amessage' in str(reply)
 
 
 def test_accounting_reply_unpack_data():
     reply = TACACSAccountingReply.unpacked(
-        six.b('\x00\x00\x08\x00\x01adata')
+        b'\x00\x00\x08\x00\x01adata'
     )
-    assert reply.data == six.b('adata')
+    assert reply.data == b'adata'
     assert 'adata' in str(reply)
 
 
@@ -306,7 +306,7 @@ def test_v4_sock(family):
     try:
         client = TACACSClient('127.0.0.1', 49, None, family=family)
         client.sock
-    except socket.error:
+    except OSError:
         pass
     assert client._sock.family == family
 
@@ -315,10 +315,10 @@ def test_v4_sock(family):
 @pytest.mark.parametrize(
     'packets, state',
     [
-        [AUTHENTICATE_HEADER + six.b('\x06\x01\x00\x00\x00\x00\x00'), 'valid'],
-        [AUTHENTICATE_HEADER + six.b('\x06\x02\x00\x00\x00\x00\x00'), 'invalid'],
-        [AUTHENTICATE_HEADER + six.b('\x10\x05\x01\x00\n\x00\x00Password: '), 'getpass'],  # noqa
-        [AUTHENTICATE_HEADER + six.b('\x06\x07\x00\x00\x00\x00\x00'), 'error'],
+        [AUTHENTICATE_HEADER + b'\x06\x01\x00\x00\x00\x00\x00', 'valid'],
+        [AUTHENTICATE_HEADER + b'\x06\x02\x00\x00\x00\x00\x00', 'invalid'],
+        [AUTHENTICATE_HEADER + b'\x10\x05\x01\x00\n\x00\x00Password: ', 'getpass'],  # noqa
+        [AUTHENTICATE_HEADER + b'\x06\x07\x00\x00\x00\x00\x00', 'error'],
     ]
 )
 def test_client_socket_send(fake_socket, packets, state):
@@ -346,7 +346,7 @@ def test_client_socket_send(fake_socket, packets, state):
 
 @pytest.mark.parametrize(
     'packets',
-    [AUTHENTICATE_HEADER_WRONG + six.b('\x06\x07\x00\x00\x00\x00\x00')]
+    [AUTHENTICATE_HEADER_WRONG + b'\x06\x07\x00\x00\x00\x00\x00']
 )
 def test_client_socket_send_wrong_headers(fake_socket, packets):
     body = TACACSAuthenticationStart(
@@ -363,8 +363,8 @@ def test_client_socket_send_wrong_headers(fake_socket, packets):
 @pytest.mark.parametrize(
     'packets',
     [
-        AUTHENTICATE_HEADER + six.b('\x10\x05\x01\x00\n\x00\x00Password: ') +  # noqa getpass
-        AUTHENTICATE_HEADER + six.b('\x06\x01\x00\x00\x00\x00\x00')  # auth_valid
+        AUTHENTICATE_HEADER + b'\x10\x05\x01\x00\n\x00\x00Password: ' +  # noqa getpass
+        AUTHENTICATE_HEADER + b'\x06\x01\x00\x00\x00\x00\x00'  # auth_valid
     ]
 )
 def test_authenticate_ascii(fake_socket, packets):
@@ -398,7 +398,7 @@ def test_authenticate_ascii(fake_socket, packets):
 
 @pytest.mark.parametrize(
     'packets',
-    [AUTHENTICATE_HEADER_V12_1 + six.b('\x06\x01\x00\x00\x00\x00\x00')]  # auth_valid
+    [AUTHENTICATE_HEADER_V12_1 + b'\x06\x01\x00\x00\x00\x00\x00']  # auth_valid
 )
 def test_authenticate_pap(fake_socket, packets):
     """
@@ -418,13 +418,13 @@ def test_authenticate_pap(fake_socket, packets):
     assert TACACSAuthenticationStart(
         'username',
         TAC_PLUS_AUTHEN_TYPE_PAP,
-        data=six.b('pass')
+        data=b'pass'
     ).packed == first_body
 
 
 @pytest.mark.parametrize(
     'packets',
-    [AUTHENTICATE_HEADER_V12_1 + six.b('\x06\x01\x00\x00\x00\x00\x00')]  # auth_valid
+    [AUTHENTICATE_HEADER_V12_1 + b'\x06\x01\x00\x00\x00\x00\x00']  # auth_valid
 )
 def test_authenticate_chap(fake_socket, packets):
     """
@@ -447,9 +447,9 @@ def test_authenticate_chap(fake_socket, packets):
         'username',
         TAC_PLUS_AUTHEN_TYPE_CHAP,
         data=(
-            six.b('A') +
-            six.b('challenge') +
-            md5(six.b('Apasschallenge')).digest()
+            b'A' +
+            b'challenge' +
+            md5(b'Apasschallenge').digest()
         )
     ).packed == first_body
 
@@ -494,7 +494,7 @@ def test_authenticate_chap_challenge_length():
 @pytest.mark.parametrize(
     'packets',
     [
-        AUTHORIZE_HEADER + six.b('\x06\x01\x00\x00\x00\x00\x00')
+        AUTHORIZE_HEADER + b'\x06\x01\x00\x00\x00\x00\x00'
     ]
 )
 def test_authorize_ascii(fake_socket, packets):
@@ -516,7 +516,7 @@ def test_authorize_ascii(fake_socket, packets):
 @pytest.mark.parametrize(
     'packets',
     [
-        AUTHORIZE_HEADER + six.b('\x06\x01\x00\x00\x00\x00\x00')
+        AUTHORIZE_HEADER + b'\x06\x01\x00\x00\x00\x00\x00'
     ]
 )
 def test_authorize_pap(fake_socket, packets):
@@ -539,7 +539,7 @@ def test_authorize_pap(fake_socket, packets):
 @pytest.mark.parametrize(
     'packets',
     [
-        AUTHORIZE_HEADER + six.b('\x06\x01\x00\x00\x00\x00\x00')
+        AUTHORIZE_HEADER + b'\x06\x01\x00\x00\x00\x00\x00'
     ]
 )
 def test_authorize_chap(fake_socket, packets):
@@ -563,7 +563,7 @@ def test_authorize_chap(fake_socket, packets):
 @pytest.mark.parametrize(
     'packets',
     [
-        ACCOUNT_HEADER + six.b('\x06\x00\x00\x00\x00\x01\x00\x00')
+        ACCOUNT_HEADER + b'\x06\x00\x00\x00\x00\x01\x00\x00'
     ]
 )
 def test_account_start(fake_socket, packets):
@@ -586,7 +586,7 @@ def test_account_start(fake_socket, packets):
 @pytest.mark.parametrize(
     'packets',
     [
-        AUTHORIZE_HEADER + six.b('\x12\x01\x01\x00\x00\x00\x00\x0bpriv-lvl=15')
+        AUTHORIZE_HEADER + b'\x12\x01\x01\x00\x00\x00\x00\x0bpriv-lvl=15'
     ]
 )
 def test_authorize_equal_priv_lvl(fake_socket, packets):
@@ -600,7 +600,7 @@ def test_authorize_equal_priv_lvl(fake_socket, packets):
 @pytest.mark.parametrize(
     'packets',
     [
-        AUTHORIZE_HEADER + six.b('\x11\x01\x01\x00\x00\x00\x00\x0bpriv-lvl=1')
+        AUTHORIZE_HEADER + b'\x11\x01\x01\x00\x00\x00\x00\x0bpriv-lvl=1'
     ]
 )
 def test_authorize_lesser_priv_lvl(fake_socket, packets):

@@ -6,7 +6,6 @@ import contextlib
 import re
 from hashlib import md5
 
-import six
 
 from .flags import (
     TAC_PLUS_MAJOR_VER, TAC_PLUS_MINOR_VER, TAC_PLUS_PRIV_LVL_MIN,
@@ -33,7 +32,7 @@ OLD_PASSWORD_PROMPT = re.compile(r'\bold\b|current|existing', re.I)
 USER_PROMPT = re.compile(r'user|login', re.I)
 
 
-class TACACSClient(object):
+class TACACSClient:
     """
     A TACACS+ authentication client.
     https://datatracker.ietf.org/doc/draft-ietf-opsawg-tacacs
@@ -152,10 +151,10 @@ class TACACSClient(object):
                     'recv header <%s>' % resp_header,
                     str(resp_header.packed)
                 ]))
-                raise socket.error
+                raise OSError
 
             # read the number of bytes specified in the response header
-            body_bytes = six.b('')
+            body_bytes = b''
             remaining = resp_header.length
             while remaining > 0:
                 body_bytes += self.sock.recv(remaining)
@@ -165,7 +164,7 @@ class TACACSClient(object):
                 body_bytes,
                 self.secret
             )
-        raise socket.timeout
+        raise TimeoutError
 
     # how often each kind of answer is sent before the client gives up on the
     # dialog: the password twice (login, then an explicit "old password" when
@@ -208,7 +207,7 @@ class TACACSClient(object):
         :return:               TACACSAuthenticationReply
         :raises:               socket.timeout, socket.error, ValueError
         """
-        start_data = six.b('')
+        start_data = b''
         if authen_type in (TAC_PLUS_AUTHEN_TYPE_PAP,
                            TAC_PLUS_AUTHEN_TYPE_CHAP):
             self.version_min = TAC_PLUS_MINOR_VER_ONE
@@ -221,21 +220,21 @@ class TACACSClient(object):
                 start_data = to_bytes(password, encoding)
 
             if authen_type == TAC_PLUS_AUTHEN_TYPE_CHAP:
-                if not isinstance(chap_ppp_id, six.string_types):
+                if not isinstance(chap_ppp_id, str):
                     raise ValueError('chap_ppp_id must be a string')
                 if len(chap_ppp_id) != 1:
                     raise ValueError('chap_ppp_id must be a 1-byte string')
-                if not isinstance(chap_challenge, six.string_types):
+                if not isinstance(chap_challenge, str):
                     raise ValueError('chap_challenge must be a string')
                 if len(chap_challenge) > 255:
                     raise ValueError('chap_challenge may not be more 255 bytes')
                 start_data = (
-                    six.b(chap_ppp_id) +
-                    six.b(chap_challenge) +
+                    to_bytes(chap_ppp_id) +
+                    to_bytes(chap_challenge) +
                     md5(
-                        six.b(chap_ppp_id) +
+                        to_bytes(chap_ppp_id) +
                         to_bytes(password, encoding) +
-                        six.b(chap_challenge)
+                        to_bytes(chap_challenge)
                     ).digest()
                 )
         with self.closing():
@@ -398,12 +397,12 @@ class TACACSClient(object):
                 'recv body <%s>' % reply
             ]))
             reply_arguments = dict([
-                arg.split(six.b('='), 1)
+                arg.split(b'=', 1)
                 for arg in reply.arguments or []
-                if arg.find(six.b('=')) > -1]
+                if arg.find(b'=') > -1]
             )
             user_priv_lvl = int(reply_arguments.get(
-                six.b('priv-lvl'), TAC_PLUS_PRIV_LVL_MAX))
+                b'priv-lvl', TAC_PLUS_PRIV_LVL_MAX))
             if user_priv_lvl < priv_lvl:
                 reply.status = TAC_PLUS_AUTHOR_STATUS_FAIL
         return reply
