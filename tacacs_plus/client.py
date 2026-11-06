@@ -15,6 +15,7 @@ from .flags import (
     TAC_PLUS_ACCT, TAC_PLUS_VIRTUAL_REM_ADDR, TAC_PLUS_VIRTUAL_PORT,
     TAC_PLUS_CONTINUE_FLAG_ABORT, TAC_PLUS_AUTHEN_CHPASS
 )
+from .exceptions import TACACSProtocolError
 from .packet import TACACSPacket, TACACSHeader
 from .authentication import (
     TACACSAuthenticationStart, TACACSAuthenticationContinue, TACACSAuthenticationReply,
@@ -112,7 +113,8 @@ class TACACSClient:
         :param expect_reply: False to return without reading a reply, e.g.
                          after TAC_PLUS_CONTINUE_FLAG_ABORT
         :return:         TACACSPacket, or None if `expect_reply` is False
-        :raises:         socket.timeout, socket.error
+        :raises:         TimeoutError, OSError (TACACSProtocolError for a
+                         reply that isn't TACACS+)
         """
         # construct a packet
         header = TACACSHeader(
@@ -125,11 +127,8 @@ class TACACSClient:
         )
         packet = TACACSPacket(header, body.packed, self.secret)
 
-        logger.debug('\n'.join([
-            body.__class__.__name__,
-            'sent header <%s>' % header,
-            'sent body <%s>' % body,
-        ]))
+        logger.debug('%s\nsent header <%s>\nsent body <%s>',
+                     body.__class__.__name__, header, body)
         self.sock.send(bytes(packet))
         if not expect_reply:
             return None
@@ -137,7 +136,7 @@ class TACACSClient:
         readable, _, _ = select.select([self.sock], [], [], self.timeout)
         if readable:
             # TACACS+ header packets are always 12 bytes
-            header_bytes = self.sock.recv(12)
+            header_bytes = self._recv_exactly(12)
             resp_header = TACACSHeader.unpacked(header_bytes)
             # If the reply header doesn't match, it's likely a non-TACACS+ TCP
             # service answering with data we don't antipicate.  Bail out.
@@ -146,25 +145,34 @@ class TACACSClient:
                 resp_header.type != header.type,
                 resp_header.session_id != header.session_id
             ]):
-                logger.error('\n'.join([
-                    resp_header.__class__.__name__,
-                    'recv header <%s>' % resp_header,
-                    str(resp_header.packed)
-                ]))
-                raise OSError
+                logger.error('%s\nrecv header <%s>\n%s',
+                             resp_header.__class__.__name__, resp_header,
+                             resp_header.packed)
+                raise TACACSProtocolError(
+                    f'unexpected reply header <{resp_header}>')
 
             # read the number of bytes specified in the response header
-            body_bytes = b''
-            remaining = resp_header.length
-            while remaining > 0:
-                body_bytes += self.sock.recv(remaining)
-                remaining = resp_header.length - len(body_bytes)
+            body_bytes = self._recv_exactly(resp_header.length)
             return TACACSPacket(
                 resp_header,
                 body_bytes,
                 self.secret
             )
         raise TimeoutError
+
+    def _recv_exactly(self, size):
+        """
+        Read `size` bytes; recv() may return fewer, and returns none once the
+        server has closed the connection.
+        """
+        data = b''
+        while len(data) < size:
+            chunk = self.sock.recv(size - len(data))
+            if not chunk:
+                raise TACACSProtocolError(
+                    f'connection closed after {len(data)} of {size} bytes')
+            data += chunk
+        return data
 
     # how often each kind of answer is sent before the client gives up on the
     # dialog: the password twice (login, then an explicit "old password" when
@@ -205,14 +213,16 @@ class TACACSClient:
         :param max_steps:      maximum number of CONTINUE packets sent
         :param encoding:       encoding of usernames and passwords on the wire
         :return:               TACACSAuthenticationReply
-        :raises:               socket.timeout, socket.error, ValueError
+        :raises:               TimeoutError, OSError (TACACSProtocolError
+                               for a reply that isn't TACACS+),
+                               ValueError
         """
         start_data = b''
         if authen_type in (TAC_PLUS_AUTHEN_TYPE_PAP,
                            TAC_PLUS_AUTHEN_TYPE_CHAP):
             self.version_min = TAC_PLUS_MINOR_VER_ONE
             if not password and prompt is not None:
-                password = prompt('password for %s: ' % username, False)
+                password = prompt(f'password for {username}: ', False)
             if not password:
                 raise ValueError('a password is required for PAP and CHAP')
 
@@ -273,7 +283,8 @@ class TACACSClient:
         :param max_steps:      maximum number of CONTINUE packets sent
         :param encoding:       encoding of usernames and passwords on the wire
         :return:               TACACSAuthenticationReply
-        :raises:               socket.timeout, socket.error
+        :raises:               TimeoutError, OSError (TACACSProtocolError
+                               for a reply that isn't TACACS+)
         """
         with self.closing():
             packet = self.send(
@@ -290,11 +301,8 @@ class TACACSClient:
 
     def _authen_reply(self, packet):
         reply = TACACSAuthenticationReply.unpacked(packet.body)
-        logger.debug('\n'.join([
-            reply.__class__.__name__,
-            'recv header <%s>' % packet.header,
-            'recv body <%s>' % reply
-        ]))
+        logger.debug('%s\nrecv header <%s>\nrecv body <%s>',
+                     reply.__class__.__name__, packet.header, reply)
         return reply
 
     def _authen_dialog(self, packet, reply, username, password, new_password,
@@ -380,7 +388,8 @@ class TACACSClient:
         :param rem_addr:       AAA request source, default to TAC_PLUS_VIRTUAL_REM_ADDR
         :param port:           AAA port, default to TAC_PLUS_VIRTUAL_PORT
         :return:               TACACSAuthenticationReply
-        :raises:               socket.timeout, socket.error
+        :raises:               TimeoutError, OSError (TACACSProtocolError
+                               for a reply that isn't TACACS+)
         """
         with self.closing():
             packet = self.send(
@@ -391,11 +400,8 @@ class TACACSClient:
                 TAC_PLUS_AUTHOR
             )
             reply = TACACSAuthorizationReply.unpacked(packet.body)
-            logger.debug('\n'.join([
-                reply.__class__.__name__,
-                'recv header <%s>' % packet.header,
-                'recv body <%s>' % reply
-            ]))
+            logger.debug('%s\nrecv header <%s>\nrecv body <%s>',
+                         reply.__class__.__name__, packet.header, reply)
             reply_arguments = dict([
                 arg.split(b'=', 1)
                 for arg in reply.arguments or []
@@ -425,7 +431,8 @@ class TACACSClient:
         :param rem_addr:       AAA request source, default to TAC_PLUS_VIRTUAL_REM_ADDR
         :param port:           AAA port, default to TAC_PLUS_VIRTUAL_PORT
         :return:               TACACSAccountingReply
-        :raises:               socket.timeout, socket.error
+        :raises:               TimeoutError, OSError (TACACSProtocolError
+                               for a reply that isn't TACACS+)
         """
         with self.closing():
             packet = self.send(
@@ -436,9 +443,6 @@ class TACACSClient:
                 TAC_PLUS_ACCT
             )
             reply = TACACSAccountingReply.unpacked(packet.body)
-            logger.debug('\n'.join([
-                reply.__class__.__name__,
-                'recv header <%s>' % packet.header,
-                'recv body <%s>' % reply
-            ]))
+            logger.debug('%s\nrecv header <%s>\nrecv body <%s>',
+                         reply.__class__.__name__, packet.header, reply)
         return reply

@@ -1,6 +1,7 @@
 # Tests for the non-interactive ASCII login and change-password dialog.
 
 from hashlib import md5
+import asyncio
 import io
 import struct
 
@@ -15,7 +16,9 @@ from tacacs_plus.flags import (
     TAC_PLUS_CONTINUE_FLAG_ABORT
 )
 from tacacs_plus.authentication import TACACSAuthenticationReply
+from tacacs_plus.async_client import TACACSClient as AsyncTACACSClient
 from tacacs_plus.client import TACACSClient
+from tacacs_plus.exceptions import TACACSProtocolError
 
 SESSION_ID = 12345
 NOECHO = TAC_PLUS_REPLY_FLAG_NOECHO
@@ -289,3 +292,31 @@ def test_pap_password_from_prompt(client):
 def test_reply_noecho_is_a_bit_test(flags, noecho):
     raw = struct.pack('!BBHH', TAC_PLUS_AUTHEN_STATUS_GETPASS, flags, 0, 0)
     assert TACACSAuthenticationReply.unpacked(raw).noecho is noecho
+
+
+def test_wrong_reply_header_is_a_protocol_error(client):
+    wrong = bytearray(reply(TAC_PLUS_AUTHEN_STATUS_PASS))
+    wrong[4:8] = struct.pack('!I', SESSION_ID + 1)  # another session
+    c = client(bytes(wrong))
+    with pytest.raises(TACACSProtocolError) as e:
+        c.authenticate('user', 'secret')
+    # still an OSError (socket.error) for callers that catch that
+    assert isinstance(e.value, OSError)
+
+
+@pytest.mark.parametrize('cut', [5, 15])  # inside the header, inside the body
+def test_connection_closed_mid_packet(client, cut):
+    """recv() returns b'' after a close; this used to loop forever."""
+    c = client(reply(TAC_PLUS_AUTHEN_STATUS_PASS, 'some message')[:cut])
+    with pytest.raises(TACACSProtocolError, match='connection closed'):
+        c.authenticate('user', 'secret')
+
+
+@pytest.mark.asyncio
+async def test_async_connection_closed_mid_packet():
+    reader = asyncio.StreamReader()
+    reader.feed_data(reply(TAC_PLUS_AUTHEN_STATUS_PASS, 'some message')[:15])
+    reader.feed_eof()
+    with pytest.raises(TACACSProtocolError, match='connection closed after 3 of'):
+        await AsyncTACACSClient._read_exactly(reader, 12)
+        await AsyncTACACSClient._read_exactly(reader, 18)

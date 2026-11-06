@@ -28,7 +28,7 @@ class TACACSPlusBackend:
             defaults={'is_superuser': False},
         )
         if created:
-            logger.debug("Created TACACS+ user %s" % (username,))
+            logger.debug("Created TACACS+ user %s", username)
         return user
 
     def authenticate(self, request, username=None, password=None):
@@ -45,7 +45,7 @@ class TACACSPlusBackend:
                 TAC_PLUS_AUTHEN_TYPES[settings.TACACSPLUS_AUTH_PROTOCOL],
             )
         except Exception as e:
-            logger.exception("TACACS+ Authentication Error: %s" % (e,))
+            logger.exception("TACACS+ Authentication Error: %s", e)
             return None
         if auth.valid:
             return self._get_or_set_user(username, password)
@@ -53,8 +53,8 @@ class TACACSPlusBackend:
             # the server asked for something the client had no answer for,
             # usually a new password because the old one has expired; a
             # login form could ask for it and pass new_password= next time
-            logger.info("TACACS+ wants more from %s: %s" % (
-                username, auth.server_msg.decode('utf-8', 'replace')))
+            logger.info("TACACS+ wants more from %s: %s",
+                        username, auth.server_msg.decode('utf-8', 'replace'))
         return None
 
     def get_user(self, user_id):

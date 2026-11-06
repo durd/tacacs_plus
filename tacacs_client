@@ -105,19 +105,19 @@ def prompt(server_msg, echo):
 
 
 def verbose_response(response):
-    print("status: %s" % response.human_status)
+    print(f"status: {response.human_status}")
     if response.data:
-        print("data: %s" % response.data)
+        print(f"data: {response.data}")
     if response.server_msg:
-        print("server_msg: %s" % response.server_msg)
+        print(f"server_msg: {response.server_msg}")
     if response.flags:
-        print("flags: %s" % response.flags)
+        print(f"flags: {response.flags}")
     if getattr(response, 'aborted', False):
         print("aborted by client")
     if response.arguments:
         print("av-pairs:")
         for arg in response.arguments:
-            print("  %s" % arg.decode('utf-8'))
+            print("  {}".format(arg.decode('utf-8')))
 
 
 def authenticate(cli, args):

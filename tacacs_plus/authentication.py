@@ -64,23 +64,23 @@ class TACACSAuthenticationStart:
             len(data),
         )
         for value in (username, port, rem_addr, data):
-            body += struct.pack('%ds' % len(value), value)
+            body += struct.pack(f'{len(value)}s', value)
         return body
 
     def __str__(self):
         return ', '.join([
-            'action: %s' % self.action,
-            'authen_type: %s' % self.authen_type,
-            'authen_service: %s' % self.service,
-            'data: %s' % self.data,
-            'data_len: %d' % len(self.data),
-            'priv_lvl: %s' % self.priv_lvl,
-            'port: %s' % self.port,
-            'port_len: %d' % len(self.port),
-            'rem_addr: %s' % self.rem_addr,
-            'rem_addr_len: %d' % len(self.rem_addr),
-            'user: %s' % self.username,
-            'user_len: %d' % len(self.username)
+            f'action: {self.action}',
+            f'authen_type: {self.authen_type}',
+            f'authen_service: {self.service}',
+            f'data: {self.data}',
+            f'data_len: {len(self.data)}',
+            f'priv_lvl: {self.priv_lvl}',
+            f'port: {self.port}',
+            f'port_len: {len(self.port)}',
+            f'rem_addr: {self.rem_addr}',
+            f'rem_addr_len: {len(self.rem_addr)}',
+            f'user: {self.username}',
+            f'user_len: {len(self.username)}'
         ])
 
 
@@ -112,16 +112,16 @@ class TACACSAuthenticationContinue:
             struct.pack('!H', len(password)) +
             struct.pack('!H', len(data)) +
             struct.pack('B', self.flags) +
-            struct.pack('%ds' % len(password), password) +
-            struct.pack('%ds' % len(data), data)
+            struct.pack(f'{len(password)}s', password) +
+            struct.pack(f'{len(data)}s', data)
         )
 
     def __str__(self):
         return ', '.join([
-            'data_len: %d' % len(self.data),
-            'flags: %s' % self.flags,
-            'user_msg: %s' % ('*' * len(self.password)),
-            'user_msg_len: %s' % len(self.password)
+            f'data_len: {len(self.data)}',
+            f'flags: {self.flags}',
+            f"user_msg: {'*' * len(self.password)}",
+            f'user_msg_len: {len(self.password)}'
         ])
 
 
@@ -197,14 +197,14 @@ class TACACSAuthenticationReply:
             TAC_PLUS_AUTHEN_STATUS_RESTART: 'RESTART',
             TAC_PLUS_AUTHEN_STATUS_ERROR: 'ERROR',
             TAC_PLUS_AUTHEN_STATUS_FOLLOW: 'FOLLOW'
-        }.get(self.status, 'UNKNOWN: %s' % self.status)
+        }.get(self.status, f'UNKNOWN: {self.status}')
 
     def __str__(self):
         return ', '.join([
-            'data: %s' % self.data,
-            'data_len: %d' % len(self.data),
-            'flags: %s' % self.flags,
-            'server_msg: %s' % self.server_msg,
-            'server_msg_len: %d' % len(self.server_msg),
-            'status: %s' % self.human_status
+            f'data: {self.data}',
+            f'data_len: {len(self.data)}',
+            f'flags: {self.flags}',
+            f'server_msg: {self.server_msg}',
+            f'server_msg_len: {len(self.server_msg)}',
+            f'status: {self.human_status}'
         ])

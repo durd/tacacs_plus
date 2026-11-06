@@ -68,24 +68,24 @@ class TACACSAuthorizationStart:
         for value in arguments:
             body += struct.pack('B', len(value))
         for value in (username, port, rem_addr):
-            body += struct.pack('%ds' % len(value), value)
+            body += struct.pack(f'{len(value)}s', value)
         for value in arguments:
-            body += struct.pack('%ds' % len(value), value)
+            body += struct.pack(f'{len(value)}s', value)
         return body
 
     def __str__(self):
         return ', '.join([
-            'args: %s' % b','.join(self.arguments),
-            'args_cnt: %d' % len(self.arguments),
-            'authen_method: %s' % self.authen_method,
-            'authen_type: %s' % self.authen_type,
-            'authen_service: %s' % self.service,
-            'port_len: %d' % len(self.port),
-            'port: %s' % self.port,
-            'priv_lvl: %s' % self.priv_lvl,
-            'rem_addr_len: %d' % len(self.rem_addr),
-            'user: %s' % self.username,
-            'user_len: %d' % len(self.username),
+            f"args: {b','.join(self.arguments)}",
+            f'args_cnt: {len(self.arguments)}',
+            f'authen_method: {self.authen_method}',
+            f'authen_type: {self.authen_type}',
+            f'authen_service: {self.service}',
+            f'port_len: {len(self.port)}',
+            f'port: {self.port}',
+            f'priv_lvl: {self.priv_lvl}',
+            f'rem_addr_len: {len(self.rem_addr)}',
+            f'user: {self.username}',
+            f'user_len: {len(self.username)}',
         ])
 
 
@@ -167,16 +167,16 @@ class TACACSAuthorizationReply:
             TAC_PLUS_AUTHOR_STATUS_PASS_REPL: 'REPL',
             TAC_PLUS_AUTHOR_STATUS_ERROR: 'ERROR',
             TAC_PLUS_AUTHOR_STATUS_FOLLOW: 'FOLLOW',
-        }.get(self.status, 'UNKNOWN: %s' % self.status)
+        }.get(self.status, f'UNKNOWN: {self.status}')
 
     def __str__(self):
         args = ', '.join([x.decode('utf-8') for x in self.arguments])
         return ', '.join([
-            'args: %s' % args,
-            'args_cnt: %d' % len(self.arguments),
-            'data: %s' % self.data,
-            'data_len: %d' % len(self.data),
-            'server_msg: %s' % self.server_msg,
-            'server_msg_len: %d' % len(self.server_msg),
-            'status: %s' % self.human_status,
+            f'args: {args}',
+            f'args_cnt: {len(self.arguments)}',
+            f'data: {self.data}',
+            f'data_len: {len(self.data)}',
+            f'server_msg: {self.server_msg}',
+            f'server_msg_len: {len(self.server_msg)}',
+            f'status: {self.human_status}',
         ])
