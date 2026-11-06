@@ -296,9 +296,10 @@ are exceptions for when there is no usable reply:
    * - ``TimeoutError``
      - No connection or no reply within ``timeout`` seconds (default 10).
    * - :class:`~tacacs_plus.exceptions.TACACSProtocolError`
-     - The reply isn't TACACS+ (e.g. the wrong port), or the server closed the
-       connection mid-reply, which is what many servers (Cisco ISE among them)
-       do when the shared secret is wrong.
+     - The reply isn't TACACS+ (e.g. the wrong port), or it's garbled, or the
+       server closed the connection mid-reply.  A **wrong shared secret** ends
+       up here too: either the server hangs up (Cisco ISE does) or its reply
+       can't be read, and the message then says "wrong shared secret?".
    * - ``ssl.SSLError``
      - With TLS: certificate not trusted, wrong name, handshake failed.
    * - ``OSError``
@@ -308,10 +309,6 @@ are exceptions for when there is no usable reply:
 
 All but ``ValueError`` are ``OSError`` subclasses, so one ``except OSError``
 covers "the server isn't usable right now".
-
-A wrong shared secret doesn't always raise: a server that answers anyway sends
-a reply the client can't de-obfuscate, which shows up as a nonsense status such
-as ``reply.human_status == 'UNKNOWN: 151'``.  If you see that, check the secret.
 
 .. code-block:: python
    :caption: handling all of them

@@ -6,7 +6,7 @@ from .flags import (
     TAC_PLUS_AUTHOR_STATUS_FAIL, TAC_PLUS_AUTHOR_STATUS_ERROR, TAC_PLUS_AUTHOR_STATUS_FOLLOW,
     TAC_PLUS_VIRTUAL_PORT, TAC_PLUS_VIRTUAL_REM_ADDR
 )
-from .packet import to_bytes
+from .packet import check_reply, to_bytes
 
 
 class TACACSAuthorizationStart:
@@ -99,8 +99,19 @@ class TACACSAuthorizationReply:
         self.arguments = arguments
         self.flags = None
 
+    STATUSES = (
+        TAC_PLUS_AUTHOR_STATUS_PASS_ADD, TAC_PLUS_AUTHOR_STATUS_PASS_REPL,
+        TAC_PLUS_AUTHOR_STATUS_FAIL, TAC_PLUS_AUTHOR_STATUS_ERROR,
+        TAC_PLUS_AUTHOR_STATUS_FOLLOW,
+    )
+
     @classmethod
-    def unpacked(cls, raw):
+    def unpacked(cls, raw, strict=False):
+        """
+        Parse a reply body.  With `strict`, raise TACACSProtocolError for a
+        body that doesn't add up or has an unknown status, e.g. because the
+        shared secret is wrong; the clients always use strict.
+        """
         #  1 2 3 4 5 6 7 8  1 2 3 4 5 6 7 8  1 2 3 4 5 6 7 8  1 2 3 4 5 6 7 8
         # +----------------+----------------+----------------+----------------+
         # |    status      |     arg_cnt    |         server_msg len          |
@@ -122,12 +133,20 @@ class TACACSAuthorizationReply:
 
         # B = unsigned char
         # !H = network-order (big-endian) unsigned short
+        if strict and len(raw) < 6:
+            check_reply('authorization reply', None, (), 6, len(raw))
+        body_length = len(raw)
         raw = io.BytesIO(raw)
         status, arg_cnt = struct.unpack('BB', raw.read(2))
         server_msg_len, data_len = struct.unpack('!HH', raw.read(4))
+        if strict and body_length < 6 + arg_cnt:
+            check_reply('authorization reply', status, cls.STATUSES, 6 + arg_cnt, body_length)
         args_lens = struct.unpack(
             'B' * arg_cnt, raw.read(arg_cnt)
         ) if arg_cnt else []
+        if strict:
+            check_reply('authorization reply', status, cls.STATUSES,
+                        6 + arg_cnt + server_msg_len + data_len + sum(args_lens), body_length)
         server_msg = raw.read(server_msg_len)
         data = raw.read(data_len) if data_len else b''
         arguments = []

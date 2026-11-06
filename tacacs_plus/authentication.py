@@ -9,7 +9,7 @@ from .flags import (
     TAC_PLUS_AUTHEN_STATUS_RESTART, TAC_PLUS_AUTHEN_STATUS_FOLLOW,
     TAC_PLUS_REPLY_FLAG_NOECHO, TAC_PLUS_AUTHEN_TYPE_PAP, TAC_PLUS_AUTHEN_TYPE_CHAP
 )
-from .packet import to_bytes
+from .packet import check_reply, to_bytes
 
 
 class TACACSAuthenticationStart:
@@ -165,8 +165,20 @@ class TACACSAuthenticationReply:
         # TAC_PLUS_CONTINUE_FLAG_ABORT instead of answering this reply
         self.aborted = False
 
+    STATUSES = (
+        TAC_PLUS_AUTHEN_STATUS_PASS, TAC_PLUS_AUTHEN_STATUS_FAIL,
+        TAC_PLUS_AUTHEN_STATUS_GETDATA, TAC_PLUS_AUTHEN_STATUS_GETUSER,
+        TAC_PLUS_AUTHEN_STATUS_GETPASS, TAC_PLUS_AUTHEN_STATUS_RESTART,
+        TAC_PLUS_AUTHEN_STATUS_ERROR, TAC_PLUS_AUTHEN_STATUS_FOLLOW,
+    )
+
     @classmethod
-    def unpacked(cls, raw):
+    def unpacked(cls, raw, strict=False):
+        """
+        Parse a reply body.  With `strict`, raise TACACSProtocolError for a
+        body that doesn't add up or has an unknown status, e.g. because the
+        shared secret is wrong; the clients always use strict.
+        """
         # 1 2 3 4 5 6 7 8  1 2 3 4 5 6 7 8  1 2 3 4 5 6 7 8  1 2 3 4 5 6 7 8
         #
         # +----------------+----------------+----------------+----------------+
@@ -179,9 +191,15 @@ class TACACSAuthenticationReply:
 
         # B = unsigned char
         # !H = network-order (big-endian) unsigned short
+        if strict and len(raw) < 6:
+            check_reply('authentication reply', None, (), 6, len(raw))
+        body_length = len(raw)
         raw = io.BytesIO(raw)
         status, flags = struct.unpack('BB', raw.read(2))
         server_msg_len, data_len = struct.unpack('!HH', raw.read(4))
+        if strict:
+            check_reply('authentication reply', status, cls.STATUSES,
+                        6 + server_msg_len + data_len, body_length)
         server_msg = raw.read(server_msg_len)
         data = raw.read(data_len)
         return cls(status, flags, server_msg, data)

@@ -84,7 +84,10 @@ in and changes passwords with this library.
 - **A `session_id` passed to `TACACSClient()` is used for every session.** It exists for
   tests; don't pass one in real code.
 - **Errors:** `TimeoutError` when no reply comes in time, `TACACSProtocolError` (a
-  subclass of `OSError`) for a reply that isn't TACACS+ or a connection closed mid-packet,
+  subclass of `OSError`) for a reply that isn't TACACS+, a garbled one (the clients
+  parse with `unpacked(..., strict=True)`: length fields must fit the body, trailing
+  bytes are allowed, the status must be known; a wrong secret shows up here) or a
+  connection closed mid-packet,
   other `OSError`s from the socket, `ValueError` for bad arguments.
 - **ruff reads `ruff.toml`**, not `setup.cfg`; it lists `bin/tacacs_client` (no `.py`)
   in `extend-include`, so `ruff check .` covers it.

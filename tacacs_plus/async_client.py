@@ -369,7 +369,7 @@ class TACACSClient:
 
     @staticmethod
     def _authen_reply(packet):
-        reply = TACACSAuthenticationReply.unpacked(packet.body)
+        reply = TACACSAuthenticationReply.unpacked(packet.body, strict=True)
         logger.debug('%s\nrecv header <%s>\nrecv body <%s>',
                      reply.__class__.__name__, packet.header, reply)
         return reply
@@ -454,7 +454,7 @@ class TACACSClient:
                 reader=reader,
                 writer=writer,
             )
-            reply = TACACSAuthorizationReply.unpacked(packet.body)
+            reply = TACACSAuthorizationReply.unpacked(packet.body, strict=True)
 
             logger.debug('%s\nrecv header <%s>\nrecv body <%s>',
                          reply.__class__.__name__, packet.header, reply)
@@ -521,7 +521,7 @@ class TACACSClient:
                 reader=reader,
                 writer=writer,
             )
-            reply = TACACSAccountingReply.unpacked(packet.body)
+            reply = TACACSAccountingReply.unpacked(packet.body, strict=True)
 
             logger.debug('%s\nrecv header <%s>\nrecv body <%s>',
                          reply.__class__.__name__, packet.header, reply)
