@@ -101,7 +101,7 @@ class TacacsServer:
         rest = body[8:]
         user = rest[:user_len].decode(self.encoding)
         data = rest[user_len + port_len + addr_len:][:data_len]
-        request = {'type': self._head[1], 'action': action, 'user': user, 'priv_lvl': priv_lvl, 'authen_type': authen_type}
+        request = {'type': self._head[1], 'version': self._head[0], 'session_id': self._head[4], 'action': action, 'user': user, 'priv_lvl': priv_lvl, 'authen_type': authen_type}
         self.requests.append(request)
         self.prompts_answered = []
         if authen_type == PAP:

@@ -15,7 +15,7 @@ from tacacs_plus.flags import (
     TAC_PLUS_AUTHEN_STATUS_GETPASS, TAC_PLUS_REPLY_FLAG_NOECHO,
     TAC_PLUS_CONTINUE_FLAG_ABORT
 )
-from tacacs_plus.authentication import TACACSAuthenticationReply
+from tacacs_plus.authentication import TACACSAuthenticationReply, TACACSAuthenticationStart
 from tacacs_plus.async_client import TACACSClient as AsyncTACACSClient
 from tacacs_plus.client import TACACSClient
 from tacacs_plus.exceptions import TACACSProtocolError
@@ -320,3 +320,14 @@ async def test_async_connection_closed_mid_packet():
     with pytest.raises(TACACSProtocolError, match='connection closed after 3 of'):
         await AsyncTACACSClient._read_exactly(reader, 12)
         await AsyncTACACSClient._read_exactly(reader, 18)
+
+
+@pytest.mark.parametrize('authen_type', [TAC_PLUS_AUTHEN_TYPE_PAP, TAC_PLUS_AUTHEN_TYPE_CHAP])
+def test_start_str_masks_pap_and_chap_data(authen_type):
+    start = TACACSAuthenticationStart('user', authen_type, data=b'hunter2')
+    assert 'hunter2' not in str(start)
+    assert 'data: *******' in str(start)
+
+
+def test_start_str_shows_ascii_data():
+    assert 'abc' in str(TACACSAuthenticationStart('user', 1, data=b'abc'))
