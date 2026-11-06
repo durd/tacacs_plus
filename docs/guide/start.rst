@@ -94,6 +94,12 @@ mean, and what to do:
    * - ``reply.server_msg``
      - The server's message as **bytes**, e.g. why a new password was refused.
        Decode it before showing it: ``reply.server_msg.decode('utf-8', 'replace')``.
+   * - ``reply.human_status == 'RESTART'``
+     - The server doesn't accept this login method, e.g. PAP.  Try again with
+       another ``authen_type``, or treat it as a failed login.  Rare.
+   * - ``reply.human_status == 'FOLLOW'``
+     - "Ask another server".  Deprecated as insecure by RFC 8907: treat it as a
+       failed login.  Rare.
    * - ``reply.human_status``
      - The status as text (``'PASS'``, ``'FAIL'``, ...), handy for logs.
 

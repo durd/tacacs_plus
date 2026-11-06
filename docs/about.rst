@@ -98,10 +98,25 @@ Limitations
   changes in :mod:`tacacs_plus.authen_dialog`.
 - **Passwords are sent as Latin-1** unless you pass ``encoding``; it must match
   what the server expects.
-- **One session per connection.**  Each call opens a new TCP (or TLS) connection;
-  single-connection mode (``TAC_PLUS_SINGLE_CONNECT_FLAG``) isn't used.
-- **FOLLOW and RESTART replies** are returned as they are, not acted on: the
-  client doesn't contact another server or restart with another method.
+- **One session per connection.**  Each call opens a new TCP (or TLS) connection,
+  runs one session and closes it.  RFC 8907's single-connection mode
+  (``TAC_PLUS_SINGLE_CONNECT_FLAG``) would let later sessions reuse the
+  connection, saving a connection (and with TLS, a handshake) per call.  It
+  matters for clients that send many requests, such as a network device sending
+  an accounting record for every command; for a few logins a minute it makes no
+  noticeable difference.  It isn't implemented: the client would have to keep
+  connections open between calls, reconnect when the server drops an idle one,
+  and share them safely between threads.
+- **FOLLOW and RESTART replies** are returned as they are, not acted on.  Treat
+  both as a failed login, as RFC 8907 says:
+
+  - *RESTART* means the server doesn't accept the login method the client used
+    (e.g. PAP) and the client may start over with another ``authen_type``.  The
+    RFC doesn't say how the server tells which methods it does accept, and a
+    client that doesn't retry must treat RESTART as a failure.
+  - *FOLLOW* means "ask another server instead".  RFC 8907 deprecates it as
+    insecure: it must not be used in modern deployments, and clients should
+    treat it as a failure.  The client never connects to another server.
 - **Authentication is always for the "login" service**, and authorization and
   accounting always say the user was authenticated by TACACS+.  Other services
   (such as PPP or enable) and the RFC's ``SENDAUTH`` action aren't supported.

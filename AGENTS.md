@@ -111,5 +111,12 @@ Not yet fixed; don't assume otherwise.
 - TACACS+ over TLS is tested only against the test server, not ISE: ISE supports it
   but it isn't enabled yet (it needs TLS 1.3 turned on in ISE first). Without TLS,
   obfuscation is MD5-based (RFC 8907 says to use TACACS+ only on secure networks).
+- Single-connection mode (`TAC_PLUS_SINGLE_CONNECT_FLAG`) is left out on purpose: ise-cpp
+  makes a few requests a minute, so one connection per session costs nothing, while
+  reusing connections needs open-connection handling, reconnects and thread safety.
+  Ask the user before implementing it. FOLLOW and RESTART replies are returned, not
+  acted on; RFC 8907 says a client that doesn't retry RESTART must treat it as FAIL,
+  and FOLLOW (deprecated) should be treated as FAIL. `reply.invalid` is only true for
+  FAIL, so callers must check `reply.valid` (see `docs/about.rst`).
 - Certificate revocation (RFC 9887 asks for it) is only checked if the caller loads
   CRLs into the context; OCSP isn't supported (see `tls_context()`).

@@ -55,8 +55,13 @@ Every example in the documentation has been run against the test server.
 - Login prompts are recognised by English words ("new", "confirm", "old", ...)
   or by their order.
 - Passwords are sent as Latin-1 unless you pass `encoding`.
-- One session per connection; no single-connection mode.
-- FOLLOW and RESTART replies are returned, not acted on.
+- One session per connection: each call opens and closes its own connection.
+  RFC 8907's single-connection mode, which reuses one connection for many
+  sessions, isn't implemented; it only matters for clients sending many
+  requests.
+- RESTART replies ("this login method isn't accepted") and FOLLOW replies
+  ("ask another server", deprecated by RFC 8907) are returned to you, not acted
+  on; treat both as a failed login.
 - Authentication is only for the "login" service.
 
 Found a problem? Open an [issue](https://github.com/durd/tacacs_plus/issues)
