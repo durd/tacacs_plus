@@ -1,0 +1,116 @@
+About
+=====
+
+What this library is, what it was built and tested against, and what it
+doesn't do (yet).  If you rely on something listed as untested, test it against
+your own server first, and please report what you find.
+
+The project
+-----------
+
+``tacacs_plus`` is a TACACS+ client for Python.  It started as
+`ansible/tacacs_plus <https://github.com/ansible/tacacs_plus>`_ by Ryan Petrello
+(Ansible by Red Hat), which is now archived; this maintained version lives at
+https://github.com/durd/tacacs_plus.  It is BSD licensed, like the original.
+
+Version 3 was written for a web application where Cisco ISE users change their
+own password.  That's why it has a non-interactive login dialog, password
+changes over TACACS+, and TLS.  Releases are on
+`GitHub <https://github.com/durd/tacacs_plus/releases>`_, not on PyPI: the
+``tacacs_plus`` package on PyPI is the archived upstream 2.6.
+
+Standards
+---------
+
+- `RFC 8907 <https://www.rfc-editor.org/rfc/rfc8907>`_, The TACACS+ Protocol:
+  authentication (ASCII, PAP, CHAP, password change), authorization and
+  accounting.
+- `RFC 9887 <https://www.rfc-editor.org/rfc/rfc9887>`_, TACACS+ over TLS 1.3.
+
+Requirements
+------------
+
+- Python 3.10 or newer; tested on 3.10 to 3.15.
+- No other packages.  The wheel installs without internet access.
+- TLS needs Python's ``ssl`` module with TLS 1.3, which every current Python build
+  has.
+
+How it's tested
+---------------
+
+Every change runs the test suite on Python 3.10 to 3.15 on Linux (GitHub
+Actions), along with a lint check, a wheel build and a strict docs build.  The
+tests are:
+
+- **Unit tests** of the packet formats, the login dialog and reply parsing, with
+  hand-built packets.
+- **End-to-end tests over TCP** against a small TACACS+ server in the test suite
+  (``tests/tacacs_server.py``), written from RFC 8907 rather than from the
+  client code.  It handles ASCII, PAP and CHAP logins, an expired password,
+  password change, authorization and accounting, with the obfuscation or with TLS.
+  Both the socket and the asyncio client, and the command-line client, are run
+  against it.
+- **TLS tests** against that server, with a test CA and server and client
+  certificates made for each run: TLS 1.3, client certificates, an unknown CA, a
+  wrong server name, a server that only offers TLS 1.2, and an obfuscated reply.
+- Every example in this documentation has been run against the test server.
+
+Development is done on macOS.
+
+What isn't tested
+-----------------
+
+- **Cisco ISE.**  Version 3 was written for ISE 3.4, but hasn't been tested
+  against it yet.  In particular:
+
+  - the exact prompts ISE sends in the login and password-change dialogs (the
+    client recognises prompts by their text, see below);
+  - whether ISE supports a voluntary password change (``change_password()``);
+  - which character encoding ISE expects for non-ASCII passwords.
+
+- **TLS against a real server.**  TLS is only tested against the test server.
+  ISE supports TACACS+ over TLS but needs TLS 1.3 enabled first; it hasn't been
+  tried yet.
+- **Other servers.**  Version 2 was used with the free
+  `tac_plus <http://www.shrubbery.net/tac_plus/>`_ server; version 3 hasn't been
+  tested against tac_plus or any other server.
+- **Authorization and accounting** are only tested against the test server,
+  which answers fixed AV pairs.  Which AV pairs a real server expects and returns
+  depends on its configuration.
+- **Windows.**  Tests only run on Linux, and development is on macOS.
+- **IPv6.**  The client can use IPv6 (``family=socket.AF_INET6``), but no test
+  connects over it.
+
+Limitations
+-----------
+
+- **Without TLS, the protection is weak.**  RFC 8907's obfuscation is based on
+  MD5 and the shared secret; the RFC says to use it only on secure networks.  An
+  ASCII or PAP login, or a password change, sends the passwords protected only
+  by it.  CHAP doesn't send the password itself.  Use TLS where the server
+  supports it.
+- **TLS:** certificates only, no pre-shared keys.  Certificate revocation is
+  checked only if you load CRLs into the context yourself, and OCSP isn't
+  supported (see :func:`~tacacs_plus.tls.tls_context`).
+- **Prompts are recognised by their text** in English: "new", "confirm",
+  "re-enter" mean the new password; "old", "current" the current one; otherwise
+  the order decides.  A server with other wording or another language may need
+  changes in :mod:`tacacs_plus.authen_dialog`.
+- **Passwords are sent as Latin-1** unless you pass ``encoding``; it must match
+  what the server expects.
+- **One session per connection.**  Each call opens a new TCP (or TLS) connection;
+  single-connection mode (``TAC_PLUS_SINGLE_CONNECT_FLAG``) isn't used.
+- **FOLLOW and RESTART replies** are returned as they are, not acted on: the
+  client doesn't contact another server or restart with another method.
+- **Authentication is always for the "login" service**, and authorization and
+  accounting always say the user was authenticated by TACACS+.  Other services
+  (such as PPP or enable) and the RFC's ``SENDAUTH`` action aren't supported.
+
+Reporting problems
+------------------
+
+Open an issue at https://github.com/durd/tacacs_plus/issues.  For a problem with
+a server, say which server and version, and include the reply's
+``human_status`` and ``server_msg``.  :doc:`guide/debugging` shows how to log
+every packet; passwords are masked in that log, but usernames and server
+messages aren't, so check before posting it.
