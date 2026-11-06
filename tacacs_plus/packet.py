@@ -182,10 +182,10 @@ class TACACSHeader:
 
     def __str__(self):
         return ', '.join([
-            'version: %s' % self.version,
-            'type: %s' % self.type,
-            'session_id: %s' % self.session_id,
-            'length: %s' % self.length,
-            'seq_no: %s' % self.seq_no,
-            'flags: %s' % self.flags,
+            f'version: {self.version}',
+            f'type: {self.type}',
+            f'session_id: {self.session_id}',
+            f'length: {self.length}',
+            f'seq_no: {self.seq_no}',
+            f'flags: {self.flags}',
         ])
