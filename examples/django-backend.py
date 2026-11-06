@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from tacacs_plus.client import TACACSClient
 from tacacs_plus.flags import TAC_PLUS_AUTHEN_TYPES
 
-logger = logging.getLogger(__file__)
+logger = logging.getLogger(__name__)
 
 
 #
@@ -49,8 +49,12 @@ class TACACSPlusBackend:
             return None
         if auth.valid:
             return self._get_or_set_user(username, password)
-        else:
-            return None
+        if auth.aborted:
+            # the server asked for something the client had no answer for,
+            # usually a new password because the old one has expired; a
+            # login form could ask for it and pass new_password= next time
+            logger.info("TACACS+ wants more from %s: %s" % (
+                username, auth.server_msg.decode('utf-8', 'replace')))
         return None
 
     def get_user(self, user_id):
