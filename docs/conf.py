@@ -16,7 +16,11 @@ project = 'tacacs_plus'
 author = 'Ryan Petrello, durd'
 copyright = 'Ansible by Red Hat and contributors'
 
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.viewcode']
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.viewcode', 'sphinx_copybutton', 'sphinx_design']
+
+# copy buttons leave out shell and Python prompts
+copybutton_prompt_text = r'\$ |>>> |\.\.\. '
+copybutton_prompt_is_regexp = True
 
 # The clients document their constructor arguments in __init__
 autoclass_content = 'both'

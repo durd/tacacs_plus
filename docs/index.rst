@@ -24,4 +24,5 @@ reference, built from the docstrings.
 .. toctree::
    :maxdepth: 2
 
+   usage
    api
