@@ -30,6 +30,10 @@ setup(
     maintainer='durd',
     maintainer_email='brodin@durd.net',
     url='https://github.com/durd/tacacs_plus',
+    project_urls={
+        'Documentation': 'https://durd.github.io/tacacs_plus/',
+        'Source': 'https://github.com/durd/tacacs_plus',
+    },
     license='BSD',
     packages=find_packages(exclude=['examples', 'tests', 'tests.*']),
     python_requires='>=3.10',
