@@ -162,11 +162,26 @@ def test_authentication_continue_pack():
     (b'\x01\x00\x00\x00\x00\x00', 'valid', 'PASS'),
     (b'\x02\x00\x00\x00\x00\x00', 'invalid', 'FAIL',),
     (b'\x07\x00\x00\x00\x00\x00', 'error', 'ERROR'),
+    (b'\x06\x00\x00\x00\x00\x00', 'restart', 'RESTART'),
+    (b'\x21\x00\x00\x00\x00\x00', 'follow', 'FOLLOW'),
 ])
 def test_authentication_reply_unpack(raw, state, human_status):
     reply = TACACSAuthenticationReply.unpacked(raw)
     assert getattr(reply, state) is True
     assert reply.human_status == human_status
+
+
+@pytest.mark.parametrize('status, invalid', [
+    (0x01, False),  # PASS
+    (0x02, True),   # FAIL
+    (0x06, True),   # RESTART: RFC 8907 5.4.3, treat as FAIL when not retrying
+    (0x07, False),  # ERROR
+    (0x21, True),   # FOLLOW: deprecated, treat as FAIL
+])
+def test_authentication_reply_invalid(status, invalid):
+    reply = TACACSAuthenticationReply.unpacked(bytes([status]) + b'\x00' * 5)
+    assert reply.invalid is invalid
+    assert reply.valid is (status == 0x01)
 
 
 def test_authentication_reply_unpack_server_msg():
@@ -218,6 +233,18 @@ def test_authorization_reply_unpack(raw, state, human_status):
     reply = TACACSAuthorizationReply.unpacked(raw)
     assert getattr(reply, state) is True
     assert reply.human_status == human_status
+
+
+@pytest.mark.parametrize('status, invalid', [
+    (0x01, False),  # PASS_ADD
+    (0x02, False),  # PASS_REPL
+    (0x10, True),   # FAIL
+    (0x11, False),  # ERROR
+    (0x21, True),   # FOLLOW: deprecated, treat as FAIL
+])
+def test_authorization_reply_invalid(status, invalid):
+    reply = TACACSAuthorizationReply.unpacked(bytes([status]) + b'\x00' * 5)
+    assert reply.invalid is invalid
 
 
 def test_authorization_reply_unpack_server_msg():

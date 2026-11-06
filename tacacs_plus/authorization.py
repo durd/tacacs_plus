@@ -164,7 +164,11 @@ class TACACSAuthorizationReply:
 
     @property
     def invalid(self):
-        return self.status == TAC_PLUS_AUTHOR_STATUS_FAIL
+        """
+        True for FAIL, and for FOLLOW, which RFC 8907 says a client should
+        treat as FAIL.
+        """
+        return self.status in (TAC_PLUS_AUTHOR_STATUS_FAIL, TAC_PLUS_AUTHOR_STATUS_FOLLOW)
 
     @property
     def error(self):

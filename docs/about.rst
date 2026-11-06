@@ -107,8 +107,10 @@ Limitations
   noticeable difference.  It isn't implemented: the client would have to keep
   connections open between calls, reconnect when the server drops an idle one,
   and share them safely between threads.
-- **FOLLOW and RESTART replies** are returned as they are, not acted on.  Treat
-  both as a failed login, as RFC 8907 says:
+- **FOLLOW and RESTART replies** aren't acted on: the client doesn't retry or
+  connect elsewhere.  As RFC 8907 says, they count as a failed login, so
+  ``reply.invalid`` is true for both (``reply.restart`` and ``reply.follow``
+  tell them apart from FAIL):
 
   - *RESTART* means the server doesn't accept the login method the client used
     (e.g. PAP) and the client may start over with another ``authen_type``.  The

@@ -83,7 +83,8 @@ mean, and what to do:
    * - ``reply.valid``
      - Accepted (status ``PASS``).
    * - ``reply.invalid``
-     - Wrong username or password (``FAIL``).
+     - Wrong username or password (``FAIL``).  Also true for ``RESTART`` and
+       ``FOLLOW``, which RFC 8907 says to treat as a failed login.
    * - ``reply.error``
      - The server couldn't handle the request (``ERROR``).  Cisco ISE answers
        this for CHAP when the password must be changed.
@@ -94,12 +95,12 @@ mean, and what to do:
    * - ``reply.server_msg``
      - The server's message as **bytes**, e.g. why a new password was refused.
        Decode it before showing it: ``reply.server_msg.decode('utf-8', 'replace')``.
-   * - ``reply.human_status == 'RESTART'``
-     - The server doesn't accept this login method, e.g. PAP.  Try again with
-       another ``authen_type``, or treat it as a failed login.  Rare.
-   * - ``reply.human_status == 'FOLLOW'``
-     - "Ask another server".  Deprecated as insecure by RFC 8907: treat it as a
-       failed login.  Rare.
+   * - ``reply.restart``
+     - The server doesn't accept this login method, e.g. PAP.  ``invalid`` is
+       true too; to retry, call again with another ``authen_type``.  Rare.
+   * - ``reply.follow``
+     - "Ask another server".  Deprecated as insecure by RFC 8907; ``invalid``
+       is true too.  Rare.
    * - ``reply.human_status``
      - The status as text (``'PASS'``, ``'FAIL'``, ...), handy for logs.
 

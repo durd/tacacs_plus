@@ -60,8 +60,8 @@ Every example in the documentation has been run against the test server.
   sessions, isn't implemented; it only matters for clients sending many
   requests.
 - RESTART replies ("this login method isn't accepted") and FOLLOW replies
-  ("ask another server", deprecated by RFC 8907) are returned to you, not acted
-  on; treat both as a failed login.
+  ("ask another server", deprecated by RFC 8907) aren't acted on; as the RFC
+  says, `reply.invalid` is true for them, like a failed login.
 - Authentication is only for the "login" service.
 
 Found a problem? Open an [issue](https://github.com/durd/tacacs_plus/issues)
