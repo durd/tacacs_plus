@@ -3,7 +3,6 @@ import socket
 import logging
 import contextlib
 from hashlib import md5
-import sys
 import asyncio
 
 
@@ -37,13 +36,9 @@ from .accounting import TACACSAccountingStart, TACACSAccountingReply
 
 logger = logging.getLogger(__name__)
 
-if sys.version_info < (3, 7):
-    raise Exception(
-        'Async TACACS client requires Python 3.7+. Current Python version: %s' % sys.version
-    )
 
 
-class TACACSClient(object):
+class TACACSClient:
     """
     A TACACS+ authentication client.
     https://datatracker.ietf.org/doc/draft-ietf-opsawg-tacacs
@@ -129,7 +124,7 @@ class TACACSClient(object):
         :raises:         socket.timeout, socket.error
         """
         if not reader or not writer:
-            raise socket.error('Working outside of context')
+            raise OSError('Working outside of context')
         # construct a packet
         header = TACACSHeader(
             self.version,
@@ -163,7 +158,7 @@ class TACACSClient(object):
             error_message += 'recv header <%s>' % resp_header + '\n'
             error_message += str(resp_header.packed)
             logger.error(error_message)
-            raise socket.error
+            raise OSError
 
         # read the number of bytes specified in the response header
         body_bytes = b''

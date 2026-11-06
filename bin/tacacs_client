@@ -6,7 +6,6 @@ import getpass
 import logging
 import argparse
 
-import six
 
 from tacacs_plus.client import TACACSClient
 from tacacs_plus.flags import (
@@ -99,7 +98,7 @@ def prompt(server_msg, echo):
     """Answer a server prompt the library has no answer for; None aborts."""
     try:
         if echo:
-            return six.moves.input(server_msg)
+            return input(server_msg)
         return getpass.getpass(server_msg)
     except EOFError:
         return None
@@ -125,8 +124,8 @@ def authenticate(cli, args):
     chap_ppp_id = None
     chap_challenge = None
     if args.authen_type == TAC_PLUS_AUTHEN_TYPE_CHAP:
-        chap_ppp_id = six.moves.input('chap PPP ID: ')
-        chap_challenge = six.moves.input('chap challenge: ')
+        chap_ppp_id = input('chap PPP ID: ')
+        chap_challenge = input('chap challenge: ')
     auth = cli.authenticate(args.username, args.password, priv_lvl=args.priv_lvl,
                             authen_type=args.authen_type, chap_ppp_id=chap_ppp_id,
                             chap_challenge=chap_challenge, rem_addr=args.rem_addr,

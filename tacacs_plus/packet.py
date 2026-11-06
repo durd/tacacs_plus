@@ -1,7 +1,17 @@
+import io
 import struct
 from hashlib import md5
 
-import six
+
+def to_bytes(value, encoding='latin-1'):
+    """
+    Encode text with `encoding`; bytes are passed through unchanged.
+
+    The default, latin-1, keeps the byte values of tacacs_plus 2.x.
+    """
+    if isinstance(value, bytes):
+        return value
+    return value.encode(encoding)
 
 
 def crypt(header, body_bytes, secret):
@@ -46,7 +56,7 @@ def crypt(header, body_bytes, secret):
     body_length = len(body_bytes)
     unhashed = (
         struct.pack('!I', header.session_id) +
-        six.b(secret) +
+        to_bytes(secret) +
         struct.pack('B', header.version) +
         struct.pack('B', header.seq_no)
     )
@@ -70,7 +80,7 @@ def crypt(header, body_bytes, secret):
     return struct.pack('B' * len(packet_body), *packet_body)
 
 
-class TACACSPacket(object):
+class TACACSPacket:
 
     def __init__(self, header, body_bytes, secret):
         """
@@ -108,7 +118,7 @@ class TACACSPacket(object):
         return crypt(self.header, self.body_bytes, self.secret)
 
 
-class TACACSHeader(object):
+class TACACSHeader:
 
     def __init__(self, version, type, session_id, length, seq_no=1, flags=0):
         self.version = version
@@ -156,7 +166,7 @@ class TACACSHeader(object):
     def unpacked(cls, raw):
         # B = unsigned char
         # !I = network-order (big-endian) unsigned int
-        raw = six.BytesIO(raw)
+        raw = io.BytesIO(raw)
         raw_chars = raw.read(4)
         if raw_chars:
             version, type, seq_no, flags = struct.unpack(

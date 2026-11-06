@@ -1,15 +1,15 @@
+import io
 import struct
-
-import six
 
 from .flags import (
     TAC_PLUS_AUTHEN_SVC_LOGIN, TAC_PLUS_AUTHOR_STATUS_PASS_ADD, TAC_PLUS_AUTHOR_STATUS_PASS_REPL,
     TAC_PLUS_AUTHOR_STATUS_FAIL, TAC_PLUS_AUTHOR_STATUS_ERROR, TAC_PLUS_AUTHOR_STATUS_FOLLOW,
     TAC_PLUS_VIRTUAL_PORT, TAC_PLUS_VIRTUAL_REM_ADDR
 )
+from .packet import to_bytes
 
 
-class TACACSAuthorizationStart(object):
+class TACACSAuthorizationStart:
 
     def __init__(self, username, authen_method, priv_lvl, authen_type,
                  arguments, rem_addr=TAC_PLUS_VIRTUAL_REM_ADDR,
@@ -50,9 +50,9 @@ class TACACSAuthorizationStart(object):
 
         # B = unsigned char
         # s = char[]
-        username = six.b(self.username)
-        rem_addr = six.b(self.rem_addr)
-        port = six.b(self.port)
+        username = to_bytes(self.username)
+        rem_addr = to_bytes(self.rem_addr)
+        port = to_bytes(self.port)
         arguments = self.arguments
         body = struct.pack(
             'B' * 8,
@@ -89,7 +89,7 @@ class TACACSAuthorizationStart(object):
         ])
 
 
-class TACACSAuthorizationReply(object):
+class TACACSAuthorizationReply:
 
     def __init__(self, status, arg_cnt, server_msg, data, arguments):
         self.status = status
@@ -122,7 +122,7 @@ class TACACSAuthorizationReply(object):
 
         # B = unsigned char
         # !H = network-order (big-endian) unsigned short
-        raw = six.BytesIO(raw)
+        raw = io.BytesIO(raw)
         status, arg_cnt = struct.unpack('BB', raw.read(2))
         server_msg_len, data_len = struct.unpack('!HH', raw.read(4))
         args_lens = struct.unpack(

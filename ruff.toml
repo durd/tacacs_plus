@@ -1,5 +1,9 @@
-# Only rules that point at bugs: syntax errors, pyflakes (undefined names,
-# unused imports, ...) and a few pycodestyle errors.  No line length or
-# formatting rules; the code still keeps Python 2-era style.
+target-version = "py310"
+
+# Rules that point at bugs: syntax errors, pyflakes (undefined names,
+# unused imports, ...) and a few pycodestyle errors, plus pyupgrade so
+# Python 2 idioms don't come back.  No line length or formatting rules;
+# %-formatting (UP031) is still used throughout and left alone.
 [lint]
-select = ["E4", "E7", "E9", "F"]
+select = ["E4", "E7", "E9", "F", "UP"]
+ignore = ["UP031"]
