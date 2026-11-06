@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-version = '3.1.0'
+version = '3.2.0'
 
 setup(
     name='tacacs_plus',
@@ -24,7 +24,7 @@ setup(
         'Programming Language :: Python :: 3.14',
         'Programming Language :: Python :: 3.15',
     ],
-    keywords='tacas tacacs+ tacacs_plus auth authentication pap chap',
+    keywords='tacacs tacacs+ tacacs_plus auth authentication pap chap tls',
     author='Ryan Petrello',
     author_email='ryan@ryanpetrello.com',
     maintainer='durd',

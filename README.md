@@ -48,7 +48,9 @@ $ tacacs_client -u myuser -H localhost account -f stop -c service=shell cmd=show
 $ tacacs_client -h
 usage: tacacs_client [-h] -u USERNAME -H HOST [-p PORT] [-l PRIV_LVL]
                      [-t {ascii,pap,chap}] [-r REM_ADDR] [-P VIRTUAL_PORT]
-                     [--timeout TIMEOUT] [-d] [-v] [-6] [-k KEY]
+                     [--timeout TIMEOUT] [-d] [-v] [-6] [--tls]
+                     [--tls-ca FILE] [--tls-cert FILE] [--tls-key FILE]
+                     [--tls-server-name NAME] [-k KEY]
                      {authenticate,change-password,authorize,account} ...
 
         Tacacs+ client with full AAA support:
@@ -57,7 +59,8 @@ usage: tacacs_client [-h] -u USERNAME -H HOST [-p PORT] [-l PRIV_LVL]
             * Authorization supports AV pairs and single commands.
             * Accounting support AV pairs and single commands.
 
-        NOTE: shared encryption key can be set via environment variable TACACS_PLUS_KEY or via argument.
+        NOTE: shared encryption key can be set via environment variable TACACS_PLUS_KEY or via argument
+              (not used with TLS).
         NOTE: user password can be setup via environment variable TACACS_PLUS_PWD or via argument.
 
 
@@ -88,6 +91,16 @@ options:
   -v, --verbose         print responses
   -6, --v6              use IPv6 addresses
   -k, --key KEY         tacacs+ shared encryption key
+
+TACACS+ over TLS (RFC 9887):
+  Any of these turns TLS on; then no shared key is used and -p is the TLS port.
+
+  --tls                 use TLS, verifying the server against the system's CAs
+  --tls-ca FILE         CA certificate(s) (PEM) that signed the server's certificate
+  --tls-cert FILE       client certificate (PEM), if the server asks for one
+  --tls-key FILE        private key of the client certificate, if not in --tls-cert
+  --tls-server-name NAME
+                        name the server's certificate must match (default: --host)
 
 $ tacacs_client authenticate -h
 usage: tacacs_client authenticate [-h] [-p PASSWORD]
@@ -195,6 +208,30 @@ user for answers the client doesn't have; `tacacs_client` does that.
 coroutines (`await cli.authenticate(...)`); its `prompt` may also be a
 coroutine function.
 
+
+#### TACACS+ over TLS (RFC 9887)
+
+With TLS 1.3 the connection is encrypted and the server is authenticated by
+its certificate, so the MD5-based obfuscation (and the shared secret) isn't
+used.  Pass an `ssl.SSLContext` as `tls` and `secret=None`;
+`tls_context()` makes one that requires TLS 1.3 and verifies the server:
+
+```python
+from tacacs_plus.client import TACACSClient
+from tacacs_plus.tls import tls_context
+
+tls = tls_context(cafile='tacacs-ca.pem')     # the CA that signed the server's certificate
+# tls = tls_context(cafile=..., certfile='client.pem', keyfile='client.key')  # if the server wants a client certificate
+cli = TACACSClient('tacacs.example.com', 300, None, tls=tls)
+authen = cli.authenticate('username', 'password')
+```
+
+RFC 9887 registers port 300 for TACACS+ over TLS; check the server's configuration.  When `host` is an
+IP address, the certificate must contain it, or pass `tls_server_name=` with
+the name it was issued for.  Certificate and handshake errors are
+`ssl.SSLError`s, which are `OSError`s.  The async client takes the same
+arguments, and `tacacs_client` has `--tls`, `--tls-ca`, `--tls-cert`,
+`--tls-key` and `--tls-server-name`.
 
 ### Development
 
