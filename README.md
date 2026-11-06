@@ -2,21 +2,65 @@
 
 **Documentation, with examples for everything:** https://durd.github.io/tacacs_plus/
 
-A maintained fork of [ansible/tacacs_plus](https://github.com/ansible/tacacs_plus),
-which is archived.  Version 3.0.0 adds a non-interactive ASCII login and
-password change (see below); the library no longer reads from the terminal.
+A TACACS+ client ([RFC 8907](https://www.rfc-editor.org/rfc/rfc8907)) for
+authentication, authorization and accounting, with a socket and an asyncio
+client and a command-line tool.
 
-A TACACS+ client that supports authentication, authorization and
-accounting.
+A maintained fork of [ansible/tacacs_plus](https://github.com/ansible/tacacs_plus),
+which is archived.  Version 3 adds a non-interactive ASCII login and password
+change (the library no longer reads from the terminal), and 3.2 adds TACACS+
+over TLS ([RFC 9887](https://www.rfc-editor.org/rfc/rfc9887)).  Python 3.10+,
+no dependencies, BSD licensed.
 
 Unlike RADIUS, which was designed for similar purposes, the TACACS+ protocol
 offers basic packet encryption but, as with most crypto designed back then,
 it's [not secure](http://www.openwall.com/articles/TACACS+-Protocol-Security)
-and definitely should not be used over untrusted networks.
+and definitely should not be used over untrusted networks without TLS.
 
-This package has been successfully used with the free
-[tac_plus](http://www.shrubbery.net/tac_plus/) TACACS+ server on a variety of
-operating systems.
+### Status: what's tested, what isn't, and limitations
+
+More detail on the [About](https://durd.github.io/tacacs_plus/about.html) page.
+
+**Tested.** Every change runs the tests on Python 3.10 to 3.15 on Linux:
+
+- unit tests of the packet formats, the login dialog and reply parsing;
+- end-to-end tests over TCP against a TACACS+ server in the test suite
+  (`tests/tacacs_server.py`, written from RFC 8907): ASCII, PAP and CHAP logins,
+  an expired password, password change, authorization and accounting, for the
+  socket and asyncio clients and the command-line tool;
+- TLS against that server, with certificates made for each run: TLS 1.3, client
+  certificates, an unknown CA, a wrong server name, a TLS 1.2-only server.
+
+Every example in the documentation has been run against the test server.
+
+**Not tested yet:**
+
+- **Cisco ISE.** Version 3 was written for ISE 3.4 but hasn't been tested
+  against it: its prompt texts, whether it supports a voluntary password change,
+  and which encoding it expects for non-ASCII passwords are unknown.
+- **TLS against a real server.** Only tested against the test server.
+- **Other servers.** Version 2 was used with the free
+  [tac_plus](http://www.shrubbery.net/tac_plus/) server; version 3 hasn't been
+  tested with tac_plus or any other server.
+- **Authorization and accounting** with a real server's AV pairs.
+- **Windows** (tests run on Linux, development is on macOS) and **IPv6**
+  connections.
+
+**Limitations:**
+
+- Without TLS, passwords are protected only by RFC 8907's MD5-based
+  obfuscation; CHAP doesn't send the password itself.
+- TLS: certificates only, no pre-shared keys; revocation is checked only with
+  CRLs you load, no OCSP.
+- Login prompts are recognised by English words ("new", "confirm", "old", ...)
+  or by their order.
+- Passwords are sent as Latin-1 unless you pass `encoding`.
+- One session per connection; no single-connection mode.
+- FOLLOW and RESTART replies are returned, not acted on.
+- Authentication is only for the "login" service.
+
+Found a problem? Open an [issue](https://github.com/durd/tacacs_plus/issues)
+with the server, its version, and the reply's `human_status` and `server_msg`.
 
 ### Basic Installation and Usage
 
