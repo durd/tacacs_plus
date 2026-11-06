@@ -36,7 +36,10 @@ in and changes passwords with this library.
 - No runtime dependencies (standard library only) and Python 3.10+. Keep it that way;
   the production server installs the wheel without internet.
 - Versioning is semantic, in `setup.py`. A change in behavior that callers can notice
-  (e.g. the library no longer prompting) is a major version.
+  (e.g. the library no longer prompting) is a major version. To release, bump the
+  version in a PR, then push a tag `v<version>` on `main`;
+  `.github/workflows/release.yml` checks the tag matches, runs the tests and publishes
+  the wheel and sdist as a GitHub release.
 
 ## Gotchas
 
@@ -76,7 +79,6 @@ Not yet fixed; don't assume otherwise.
 - Unverified against ISE 3.4p7: its prompt texts and order, whether it supports CHPASS,
   and whether it expects UTF-8 or Latin-1. A probe (`tools/tacacs_probe.py` on ise-cpp's
   `tools/tacacs-probe` branch) still has to be run.
-- No release yet: no git tags, and wheels only exist as CI artifacts (kept 90 days).
 - Obfuscation is MD5-based (RFC 8907 says to use TACACS+ only on secure networks);
   TACACS+ over TLS (RFC 9887) isn't supported.
 - `async_client.flow_control()` connects with a blocking `socket.connect()` inside the
