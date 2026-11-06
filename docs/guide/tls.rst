@@ -1,5 +1,3 @@
-:hide-toc:
-
 TACACS+ over TLS
 ================
 

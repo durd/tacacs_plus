@@ -1,5 +1,3 @@
-:hide-toc:
-
 Debugging and the command line
 ==============================
 

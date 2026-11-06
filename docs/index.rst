@@ -1,5 +1,3 @@
-:hide-toc:
-
 tacacs_plus
 ===========
 
