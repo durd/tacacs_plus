@@ -191,13 +191,17 @@ password).  `encoding` (default `latin-1`, as before) is used for the
 username and passwords.  Pass `prompt=callable(server_msg, echo)` to ask a
 user for answers the client doesn't have; `tacacs_client` does that.
 
+`tacacs_plus.async_client.TACACSClient` has the same methods and arguments as
+coroutines (`await cli.authenticate(...)`); its `prompt` may also be a
+coroutine function.
+
 
 ### Development
 
 ```
 $ pip install -e . -r requirements-dev.txt
 $ pytest
-$ ruff check . bin/tacacs_client tacacs_client
+$ ruff check .
 ```
 
 `tests/tacacs_server.py` is a small TACACS+ server written from RFC 8907 (PAP,

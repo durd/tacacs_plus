@@ -31,7 +31,7 @@ jobs:
         with:
           python-version: "3.14"
       - run: pip install -r requirements-dev.txt
-      - run: ruff check . bin/tacacs_client tacacs_client
+      - run: ruff check .
 
   build:
     runs-on: ubuntu-latest

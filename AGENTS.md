@@ -29,8 +29,6 @@ in and changes passwords with this library.
   or use `random` for it.
 - Don't change what goes on the wire by default (Latin-1 encoding, minor versions,
   prompt matching) without a version bump and a note in the PR: ise-cpp depends on it.
-- Keep `bin/tacacs_client` and the root `tacacs_client` identical
-  (`cp bin/tacacs_client tacacs_client`).
 - Add a test for every behavior change. Protocol behavior is tested against
   `tests/tacacs_server.py` over TCP (`tests/test_rfc_server.py`); packet details and the
   dialog logic with a scripted socket (`tests/test_authen_dialog.py`).
@@ -54,8 +52,8 @@ in and changes passwords with this library.
 - **The test server is not ISE.** Its prompts ("Password: ", "Enter new password: ",
   "Confirm new password: ") are the same guesses the client makes, so passing tests
   show the client speaks the protocol, not that it works with ISE. How prompts are
-  recognized is in `TACACSClient._prompt_kind` (regexes at the top of `client.py`) and
-  `ANSWER_LIMITS`.
+  recognized is in `tacacs_plus/authen_dialog.py` (`prompt_kind`, the regexes and
+  `ANSWER_LIMITS`).
 - **After an abort the server sends nothing.** The client sends CONTINUE with
   `TAC_PLUS_CONTINUE_FLAG_ABORT` via `send(..., expect_reply=False)` and returns at once,
   so a test can't assert on the test server's state right after an abort: the server
@@ -63,16 +61,18 @@ in and changes passwords with this library.
 - **Flag `0x01` means two things:** `TAC_PLUS_REPLY_FLAG_NOECHO` in a server REPLY,
   `TAC_PLUS_CONTINUE_FLAG_ABORT` in a client CONTINUE. Test reply flags with
   `reply.noecho` (a bit test), never `== 0x01` or the abort constant.
-- **`async_client.py` is behind `client.py`:** it answers only one GETPASS and has no
-  `new_password`, `change_password`, `prompt` or `encoding`. ise-cpp doesn't use it.
-  Fix bugs in both clients.
+- **Two clients, one API:** `client.py` (sockets) and `async_client.py` (asyncio) have
+  the same methods and arguments. What they share (START data, prompt matching,
+  answer limits) is in `authen_dialog.py`; each keeps its own send loop. Change and
+  test both: `tests/test_rfc_server.py` runs the async client against the test server
+  too. ise-cpp uses the sync one.
 - **A `session_id` passed to `TACACSClient()` is used for every session.** It exists for
   tests; don't pass one in real code.
 - **Errors:** `TimeoutError` when no reply comes in time, `TACACSProtocolError` (a
   subclass of `OSError`) for a reply that isn't TACACS+ or a connection closed mid-packet,
   other `OSError`s from the socket, `ValueError` for bad arguments.
-- **ruff reads `ruff.toml`**, not `setup.cfg`. Files without `.py` are only linted when
-  named: `ruff check . bin/tacacs_client tacacs_client`.
+- **ruff reads `ruff.toml`**, not `setup.cfg`; it lists `bin/tacacs_client` (no `.py`)
+  in `extend-include`, so `ruff check .` covers it.
 - **Tests:** `pip install -e . -r requirements-dev.txt`, then `pytest` from
   the repo root. `setup.cfg` adds coverage options, so pytest needs `pytest-cov`.
   `tests/` is excluded from the wheel.
@@ -86,8 +86,3 @@ Not yet fixed; don't assume otherwise.
   `tools/tacacs-probe` branch) still has to be run.
 - Obfuscation is MD5-based (RFC 8907 says to use TACACS+ only on secure networks);
   TACACS+ over TLS (RFC 9887) isn't supported.
-- `async_client.flow_control()` connects with a blocking `socket.connect()` inside the
-  event loop.
-- `authorize()` and `account()` take `arguments=[]` as a default (not mutated, but
-  fragile).
-- `tacacs_client` exists twice (root and `bin/`).

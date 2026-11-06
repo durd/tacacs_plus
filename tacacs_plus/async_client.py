@@ -2,7 +2,7 @@ import socket
 import logging
 import secrets
 import contextlib
-from hashlib import md5
+import inspect
 import asyncio
 
 
@@ -11,7 +11,6 @@ from .flags import (
     TAC_PLUS_MINOR_VER,
     TAC_PLUS_PRIV_LVL_MIN,
     TAC_PLUS_AUTHEN_TYPE_CHAP,
-    TAC_PLUS_MINOR_VER_ONE,
     TAC_PLUS_AUTHEN_TYPE_PAP,
     TAC_PLUS_AUTHEN,
     TAC_PLUS_AUTHEN_TYPE_ASCII,
@@ -22,7 +21,10 @@ from .flags import (
     TAC_PLUS_ACCT,
     TAC_PLUS_VIRTUAL_REM_ADDR,
     TAC_PLUS_VIRTUAL_PORT,
+    TAC_PLUS_AUTHEN_CHPASS,
+    TAC_PLUS_CONTINUE_FLAG_ABORT,
 )
+from .authen_dialog import AuthenDialog, start_data
 from .exceptions import TACACSProtocolError
 from .packet import TACACSPacket, TACACSHeader
 from .authentication import (
@@ -36,15 +38,21 @@ from .accounting import TACACSAccountingStart, TACACSAccountingReply
 logger = logging.getLogger(__name__)
 
 
+async def _ask(prompt, *args):
+    """Call `prompt`, which may be a plain function or a coroutine function."""
+    answer = prompt(*args)
+    if inspect.isawaitable(answer):
+        answer = await answer
+    return answer
+
+
 
 class TACACSClient:
     """
     An asyncio TACACS+ client for authentication, authorization and accounting.
     https://www.rfc-editor.org/rfc/rfc8907
 
-    Unlike tacacs_plus.client.TACACSClient, it answers only one GETPASS in an
-    ASCII login and has no new_password, change_password, prompt or encoding:
-    any further question from the server is returned as the reply.
+    The same API as tacacs_plus.client.TACACSClient, with coroutines.
 
     An open source TACACS+ server daemon is available at
     http://www.shrubbery.net/tac_plus/
@@ -107,25 +115,21 @@ class TACACSClient:
 
     @contextlib.asynccontextmanager
     async def flow_control(self):
-        if self.family == socket.AF_INET:
-            conn = (self.host, self.port)
-        else:
-            # For AF_INET6 address family, a four-tuple (host, port,
-            # flowinfo, scopeid) is used
-            conn = (self.host, self.port, 0, 0)
-        sock = socket.socket(self.family, socket.SOCK_STREAM)
-        sock.settimeout(self.timeout)
-        sock.connect(conn)
-
-        reader, writer = await asyncio.open_connection(sock=sock)
+        try:
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_connection(self.host, self.port, family=self.family),
+                self.timeout)
+        except asyncio.TimeoutError:
+            # asyncio.TimeoutError is only the builtin TimeoutError from 3.11
+            raise TimeoutError(f'no connection to {self.host}:{self.port}') from None
         try:
             yield reader, writer
         finally:
             writer.close()
             await writer.wait_closed()
-            sock.close()
 
-    async def send(self, body, req_type, seq_no=1, reader=None, writer=None):
+    async def send(self, body, req_type, seq_no=1, reader=None, writer=None,
+                   expect_reply=True):
         """
         Send one TACACS+ packet and read the server's reply.
 
@@ -143,7 +147,9 @@ class TACACSClient:
                          numbers.
         :param reader:   asyncio.StreamReader instance
         :param writer:   asyncio.StreamWriter instance
-        :return:         TACACSPacket
+        :param expect_reply: False to return without reading a reply, e.g.
+                         after TAC_PLUS_CONTINUE_FLAG_ABORT
+        :return:         TACACSPacket, or None if `expect_reply` is False
         :raises:         TimeoutError, OSError (TACACSProtocolError for a
                          reply that isn't TACACS+)
         """
@@ -164,9 +170,11 @@ class TACACSClient:
 
         writer.write(bytes(packet))
         await writer.drain()
+        if not expect_reply:
+            return None
 
         # TACACS+ header packets are always 12 bytes
-        header_bytes = await self._read_exactly(reader, 12)
+        header_bytes = await self._read_exactly(reader, 12, self.timeout)
         resp_header = TACACSHeader.unpacked(header_bytes)
         # If the reply header doesn't match, it's likely a non-TACACS+ TCP
         # service answering with data we don't antipicate.  Bail out.
@@ -183,18 +191,22 @@ class TACACSClient:
                 f'unexpected reply header <{resp_header}>')
 
         # read the number of bytes specified in the response header
-        body_bytes = await self._read_exactly(reader, resp_header.length)
+        body_bytes = await self._read_exactly(reader, resp_header.length, self.timeout)
         return TACACSPacket(resp_header, body_bytes, self.secret)
 
     @staticmethod
-    async def _read_exactly(reader, size):
+    async def _read_exactly(reader, size, timeout=None):
         """
         Read `size` bytes; read() may return fewer, and returns none once the
-        server has closed the connection.
+        server has closed the connection.  Each read waits at most `timeout`
+        seconds.
         """
         data = b''
         while len(data) < size:
-            chunk = await reader.read(size - len(data))
+            try:
+                chunk = await asyncio.wait_for(reader.read(size - len(data)), timeout)
+            except asyncio.TimeoutError:
+                raise TimeoutError(f'no reply after {len(data)} of {size} bytes') from None
             if not chunk:
                 raise TACACSProtocolError(
                     f'connection closed after {len(data)} of {size} bytes')
@@ -204,16 +216,23 @@ class TACACSClient:
     async def authenticate(
         self,
         username,
-        password,
+        password=None,
         priv_lvl=TAC_PLUS_PRIV_LVL_MIN,
         authen_type=TAC_PLUS_AUTHEN_TYPE_ASCII,
         chap_ppp_id=None,
         chap_challenge=None,
         rem_addr=TAC_PLUS_VIRTUAL_REM_ADDR,
         port=TAC_PLUS_VIRTUAL_PORT,
+        new_password=None,
+        prompt=None,
+        max_steps=10,
+        encoding='latin-1',
     ):
         """
         Authenticate to a TACACS+ server with a username and password.
+
+        Works like tacacs_plus.client.TACACSClient.authenticate, including the
+        ASCII dialog; `prompt` may also be a coroutine function.
 
         :param username:
         :param password:       the user's (current) password
@@ -228,33 +247,23 @@ class TACACSClient:
                                each character is one byte)
         :param rem_addr:       AAA request source, default to TAC_PLUS_VIRTUAL_REM_ADDR
         :param port:           AAA port, default to TAC_PLUS_VIRTUAL_PORT
+        :param new_password:   answer when the server asks for a new password
+                               (ASCII only, e.g. an expired password)
+        :param prompt:         optional callable `prompt(server_msg, echo)`
+                               returning the answer as a string, or None to
+                               abort; used when no answer is known
+        :param max_steps:      maximum number of CONTINUE packets sent
+        :param encoding:       encoding of usernames and passwords on the wire
         :return:               TACACSAuthenticationReply
         :raises:               TimeoutError, OSError (TACACSProtocolError
-                               for a reply that isn't TACACS+)
+                               for a reply that isn't TACACS+),
+                               ValueError
         """
-        start_data = b''
-        version_min = None
-        if authen_type in (TAC_PLUS_AUTHEN_TYPE_PAP,
-                           TAC_PLUS_AUTHEN_TYPE_CHAP):
-            version_min = TAC_PLUS_MINOR_VER_ONE
-
-            if authen_type == TAC_PLUS_AUTHEN_TYPE_PAP:
-                start_data = password.encode()
-
-            if authen_type == TAC_PLUS_AUTHEN_TYPE_CHAP:
-                if not isinstance(chap_ppp_id, str):
-                    raise ValueError('chap_ppp_id must be a string')
-                if len(chap_ppp_id) != 1:
-                    raise ValueError('chap_ppp_id must be a 1-byte string')
-                if not isinstance(chap_challenge, str):
-                    raise ValueError('chap_challenge must be a string')
-                if len(chap_challenge) > 255:
-                    raise ValueError('chap_challenge may not be more 255 bytes')
-
-                start_data = chap_ppp_id.encode()
-                start_data += chap_challenge.encode()
-                data_to_md5 = (chap_ppp_id + password + chap_challenge).encode()
-                start_data += md5(data_to_md5).digest()
+        if (authen_type in (TAC_PLUS_AUTHEN_TYPE_PAP, TAC_PLUS_AUTHEN_TYPE_CHAP)
+                and not password and prompt is not None):
+            password = await _ask(prompt, f'password for {username}: ', False)
+        data, version_min = start_data(authen_type, password, chap_ppp_id,
+                                       chap_challenge, encoding)
         self._new_session(version_min)
         async with self.flow_control() as (reader, writer):
             packet = await self.send(
@@ -262,32 +271,114 @@ class TACACSClient:
                     username,
                     authen_type,
                     priv_lvl,
-                    start_data,
+                    data,
                     rem_addr=rem_addr,
                     port=port,
+                    encoding=encoding,
                 ),
                 TAC_PLUS_AUTHEN,
                 reader=reader,
                 writer=writer,
             )
-            reply = TACACSAuthenticationReply.unpacked(packet.body)
+            reply = self._authen_reply(packet)
+            if authen_type == TAC_PLUS_AUTHEN_TYPE_ASCII:
+                reply = await self._authen_dialog(
+                    packet, reply, reader, writer, username, password,
+                    new_password, prompt, max_steps, encoding)
 
-            logger.debug('%s\nrecv header <%s>\nrecv body <%s>',
-                         reply.__class__.__name__, packet.header, reply)
+        return reply
 
-            if authen_type == TAC_PLUS_AUTHEN_TYPE_ASCII and reply.getpass:
-                packet = await self.send(
-                    TACACSAuthenticationContinue(password),
+    async def change_password(
+        self,
+        username,
+        old_password=None,
+        new_password=None,
+        priv_lvl=TAC_PLUS_PRIV_LVL_MIN,
+        rem_addr=TAC_PLUS_VIRTUAL_REM_ADDR,
+        port=TAC_PLUS_VIRTUAL_PORT,
+        prompt=None,
+        max_steps=10,
+        encoding='latin-1',
+    ):
+        """
+        Change a user's password with an ASCII TAC_PLUS_AUTHEN_CHPASS session,
+        like tacacs_plus.client.TACACSClient.change_password.
+
+        :param username:
+        :param old_password:
+        :param new_password:
+        :param priv_lvl:
+        :param rem_addr:       AAA request source, default to TAC_PLUS_VIRTUAL_REM_ADDR
+        :param port:           AAA port, default to TAC_PLUS_VIRTUAL_PORT
+        :param prompt:         see `authenticate`
+        :param max_steps:      maximum number of CONTINUE packets sent
+        :param encoding:       encoding of usernames and passwords on the wire
+        :return:               TACACSAuthenticationReply
+        :raises:               TimeoutError, OSError (TACACSProtocolError
+                               for a reply that isn't TACACS+)
+        """
+        self._new_session()
+        async with self.flow_control() as (reader, writer):
+            packet = await self.send(
+                TACACSAuthenticationStart(
+                    username,
+                    TAC_PLUS_AUTHEN_TYPE_ASCII,
+                    priv_lvl,
+                    rem_addr=rem_addr,
+                    port=port,
+                    action=TAC_PLUS_AUTHEN_CHPASS,
+                    encoding=encoding,
+                ),
+                TAC_PLUS_AUTHEN,
+                reader=reader,
+                writer=writer,
+            )
+            reply = self._authen_reply(packet)
+            reply = await self._authen_dialog(
+                packet, reply, reader, writer, username, old_password,
+                new_password, prompt, max_steps, encoding)
+        return reply
+
+    @staticmethod
+    def _authen_reply(packet):
+        reply = TACACSAuthenticationReply.unpacked(packet.body)
+        logger.debug('%s\nrecv header <%s>\nrecv body <%s>',
+                     reply.__class__.__name__, packet.header, reply)
+        return reply
+
+    async def _authen_dialog(self, packet, reply, reader, writer, username,
+                             password, new_password, prompt, max_steps, encoding):
+        """
+        Answer the ASCII dialog like tacacs_plus.client.TACACSClient's
+        _authen_dialog, see AuthenDialog.
+        """
+        dialog = AuthenDialog(username, password, new_password, max_steps, encoding)
+        while dialog.asks(reply):
+            kind, answer = dialog.known_answer(reply)
+            if answer is None and prompt is not None and dialog.steps_left:
+                answer = await _ask(prompt, dialog.server_msg(reply), not reply.noecho)
+            if answer is None or not dialog.steps_left:
+                await self.send(
+                    TACACSAuthenticationContinue(
+                        '', flags=TAC_PLUS_CONTINUE_FLAG_ABORT),
                     TAC_PLUS_AUTHEN,
                     packet.seq_no + 1,
                     reader,
                     writer,
+                    expect_reply=False,
                 )
-                reply = TACACSAuthenticationReply.unpacked(packet.body)
+                reply.aborted = True
+                break
 
-                logger.debug('%s\nrecv header <%s>\nrecv body <%s>',
-                             reply.__class__.__name__, packet.header, reply)
-
+            dialog.answered(kind)
+            packet = await self.send(
+                TACACSAuthenticationContinue(answer, encoding=encoding),
+                TAC_PLUS_AUTHEN,
+                packet.seq_no + 1,
+                reader,
+                writer,
+            )
+            reply = self._authen_reply(packet)
         return reply
 
     async def authorize(

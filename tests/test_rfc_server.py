@@ -2,7 +2,9 @@
 # They check the protocol (obfuscation, sequence numbers, the ASCII dialog), not
 # how Cisco ISE behaves; see the server's docstring.
 
+import asyncio
 import os
+import socket
 import subprocess
 import sys
 
@@ -106,10 +108,10 @@ async def test_async_client():
         cli = AsyncTACACSClient('127.0.0.1', srv.port, SECRET, timeout=5)
         assert (await cli.authenticate('alice', 'secret')).valid
         assert (await cli.authenticate('alice', 'secret', authen_type=TAC_PLUS_AUTHEN_TYPE_PAP)).valid
-        # the async client has no dialog: it returns the server's next question,
-        # which used to be turned into FAIL because the prompt has NOECHO set
+        # without a new password the dialog is aborted at the server's question
+        # (which used to be turned into FAIL because the prompt has NOECHO set)
         r = await cli.authenticate('bob', 'expired')
-        assert r.getdata and r.noecho
+        assert r.getdata and r.noecho and r.aborted
     finally:
         srv.close()
 
@@ -168,3 +170,68 @@ async def test_async_new_session_per_session():
         assert [r['version'] for r in srv.requests] == [0xc1, 0xc0]
     finally:
         srv.close()
+
+
+def async_client(srv, timeout=5):
+    return AsyncTACACSClient('127.0.0.1', srv.port, SECRET, timeout=timeout)
+
+
+@pytest.mark.asyncio
+async def test_async_expired_password_and_change_password(server, encoding):
+    new = new_password(encoding)
+    r = await async_client(server).authenticate('bob', 'expired', new_password=new, encoding=encoding)
+    assert r.valid and r.server_msg == b'Password changed'
+    assert (await async_client(server).authenticate('bob', new, encoding=encoding)).valid
+    r = await async_client(server).change_password('alice', 'g\xe5mla', new, encoding=encoding)
+    assert r.valid
+    assert server.requests[-1]['action'] == TAC_PLUS_AUTHEN_CHPASS
+    assert (await async_client(server).authenticate('alice', new, encoding=encoding)).valid
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('authen_type', [TAC_PLUS_AUTHEN_TYPE_PAP, TAC_PLUS_AUTHEN_TYPE_CHAP])
+async def test_async_pap_and_chap_encoding(server, encoding, authen_type):
+    r = await async_client(server).authenticate('alice', 'g\xe5mla', authen_type=authen_type,
+                                                chap_ppp_id='A', chap_challenge='0123456789abcdef',
+                                                encoding=encoding)
+    assert r.valid
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('coroutine', [False, True])
+async def test_async_prompt(server, coroutine):
+    asked = []
+
+    def answer(msg, echo):
+        asked.append((msg, echo))
+        return 'newpw'
+
+    async def answer_async(msg, echo):
+        await asyncio.sleep(0)
+        return answer(msg, echo)
+
+    r = await async_client(server).authenticate('bob', 'expired',
+                                                prompt=answer_async if coroutine else answer)
+    assert r.valid
+    assert asked == [('Enter new password: ', False), ('Confirm new password: ', False)]
+
+
+@pytest.mark.asyncio
+async def test_async_pap_without_password():
+    with pytest.raises(ValueError):
+        await AsyncTACACSClient('127.0.0.1', 49, SECRET).authenticate(
+            'alice', authen_type=TAC_PLUS_AUTHEN_TYPE_PAP)
+
+
+@pytest.mark.asyncio
+async def test_async_read_timeout():
+    """A server that accepts but never answers; reads used to wait forever."""
+    silent = socket.socket()
+    silent.bind(('127.0.0.1', 0))
+    silent.listen()
+    try:
+        cli = AsyncTACACSClient('127.0.0.1', silent.getsockname()[1], SECRET, timeout=0.3)
+        with pytest.raises(TimeoutError):
+            await cli.authenticate('alice', 'secret')
+    finally:
+        silent.close()
