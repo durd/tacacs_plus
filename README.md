@@ -17,10 +17,16 @@ This package has been successfully used with the free
 operating systems.
 
 ### Basic Installation and Usage
+
+This fork isn't on PyPI, where `tacacs_plus` is the archived upstream 2.6.
+Install it from git, or build a wheel with `pip wheel --no-deps .` (CI also
+builds one for each push) and upload it to your own index.
+
 ```
-$ pip install tacacs_plus
+$ pip install git+https://github.com/durd/tacacs_plus.git
 
 $ tacacs_client -u myuser -H localhost authenticate
+$ tacacs_client -u myuser -H localhost -v change-password
 $ tacacs_client -u myuser -H localhost authenticate -t pap
 $ tacacs_client -u myuser -H localhost -v authenticate -t chap
 status: PASS
@@ -41,12 +47,12 @@ $ tacacs_client -u myuser -H localhost account -f stop -c service=shell cmd=show
 $ tacacs_client -h
 usage: tacacs_client [-h] -u USERNAME -H HOST [-p PORT] [-l PRIV_LVL]
                      [-t {ascii,pap,chap}] [-r REM_ADDR] [-P VIRTUAL_PORT]
-                     [--timeout TIMEOUT] [-d] [-v] [-k KEY]
-                     {authenticate,authorize,account} ...
+                     [--timeout TIMEOUT] [-d] [-v] [-6] [-k KEY]
+                     {authenticate,change-password,authorize,account} ...
 
         Tacacs+ client with full AAA support:
 
-            * Authentication supports both ascii, pap and chap.
+            * Authentication supports ascii, pap and chap
             * Authorization supports AV pairs and single commands.
             * Accounting support AV pairs and single commands.
 
@@ -55,56 +61,66 @@ usage: tacacs_client [-h] -u USERNAME -H HOST [-p PORT] [-l PRIV_LVL]
 
 
 positional arguments:
-  {authenticate,authorize,account}
+  {authenticate,change-password,authorize,account}
                         action to perform over the tacacs+ server
     authenticate        authenticate against a tacacs+ server
+    change-password     change a user's password (asks for the new password)
     authorize           authorize a command against a tacacs+ server
     account             account commands with accounting flags against a tacacs+ server
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
-  -u USERNAME, --username USERNAME
+  -u, --username USERNAME
                         user name
-  -H HOST, --host HOST  tacacs+ server address
-  -p PORT, --port PORT  tacacs+ server port (default 49)
-  -l PRIV_LVL, --priv-lvl PRIV_LVL
+  -H, --host HOST       tacacs+ server address
+  -p, --port PORT       tacacs+ server port (default 49)
+  -l, --priv-lvl PRIV_LVL
                         user privilege level
-  -t {ascii,pap,chap}, --authen-type {ascii,pap,chap}
+  -t, --authen-type {ascii,pap,chap}
                         authentication type
-  -r REM_ADDR, --rem-addr REM_ADDR
+  -r, --rem-addr REM_ADDR
                         remote address (logged by tacacs server)
-  -P VIRTUAL_PORT, --virtual-port VIRTUAL_PORT
+  -P, --virtual-port VIRTUAL_PORT
                         console port used in connection (logged by tacacs server)
   --timeout TIMEOUT
   -d, --debug           enable debugging output
   -v, --verbose         print responses
   -6, --v6              use IPv6 addresses
-  -k KEY, --key KEY     tacacs+ shared encryption key
+  -k, --key KEY         tacacs+ shared encryption key
 
 $ tacacs_client authenticate -h
 usage: tacacs_client authenticate [-h] [-p PASSWORD]
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
-  -p PASSWORD, --password PASSWORD
+  -p, --password PASSWORD
                         user password
+
+$ tacacs_client change-password -h
+usage: tacacs_client change-password [-h] [-p PASSWORD]
+
+options:
+  -h, --help            show this help message and exit
+  -p, --password PASSWORD
+                        current user password
 
 $ tacacs_client authorize -h
 usage: tacacs_client authorize [-h] -c CMDS [CMDS ...]
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
-  -c CMDS [CMDS ...], --cmds CMDS [CMDS ...]
+  -c, --cmds CMDS [CMDS ...]
                         list of cmds to authorize
 
 $ tacacs_client account -h
-usage: tacacs_client account [-h] -c CMDS [CMDS ...] -f {start,stop,update}
+usage: tacacs_client account [-h] -c CMDS [CMDS ...]
+                                                 -f {start,stop,update}
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
-  -c CMDS [CMDS ...], --cmds CMDS [CMDS ...]
+  -c, --cmds CMDS [CMDS ...]
                         list of cmds to authorize
-  -f {start,stop,update}, --flag {start,stop,update}
+  -f, --flag {start,stop,update}
                         accounting flag
 ```
 
