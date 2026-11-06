@@ -4,7 +4,7 @@ TACACS+ over TLS (RFC 9887).
 Pass an ssl.SSLContext as `tls` to either client, and `secret=None`: with TLS,
 packet bodies must not be obfuscated (the TAC_PLUS_UNENCRYPTED_FLAG is set
 instead), and TLS 1.3 or newer is required.  tls_context() builds a suitable
-context.
+context.  RFC 9887 registers TCP port 300 ("tacacss") for it.
 """
 import ssl
 
@@ -14,6 +14,12 @@ def tls_context(cafile=None, capath=None, cadata=None, certfile=None,
     """
     An ssl.SSLContext for TACACS+ over TLS: TLS 1.3 or newer, and the
     server's certificate and hostname verified.
+
+    RFC 9887 also asks for revocation checking, which Python's ssl module
+    does only with CRLs you load yourself: call
+    `context.load_verify_locations(crl_file)` and set
+    `context.verify_flags |= ssl.VERIFY_CRL_CHECK_LEAF` (or
+    VERIFY_CRL_CHECK_CHAIN).  OCSP isn't supported.
 
     :param cafile:   PEM file with the CA certificate(s) that signed the
                      server's certificate; with no cafile, capath or cadata,

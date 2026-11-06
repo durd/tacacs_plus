@@ -94,3 +94,5 @@ Not yet fixed; don't assume otherwise.
 - TACACS+ over TLS is tested only against the test server, not ISE: ISE supports it
   but it isn't enabled yet (it needs TLS 1.3 turned on in ISE first). Without TLS,
   obfuscation is MD5-based (RFC 8907 says to use TACACS+ only on secure networks).
+- Certificate revocation (RFC 9887 asks for it) is only checked if the caller loads
+  CRLs into the context; OCSP isn't supported (see `tls_context()`).

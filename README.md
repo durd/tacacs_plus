@@ -226,7 +226,7 @@ cli = TACACSClient('tacacs.example.com', 300, None, tls=tls)
 authen = cli.authenticate('username', 'password')
 ```
 
-The port is the server's TLS port; check its configuration.  When `host` is an
+RFC 9887 registers port 300 for TACACS+ over TLS; check the server's configuration.  When `host` is an
 IP address, the certificate must contain it, or pass `tls_server_name=` with
 the name it was issued for.  Certificate and handshake errors are
 `ssl.SSLError`s, which are `OSError`s.  The async client takes the same

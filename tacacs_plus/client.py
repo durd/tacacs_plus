@@ -182,6 +182,7 @@ class TACACSClient:
                     f'unexpected reply header <{resp_header}>')
             # RFC 9887: over TLS, packets must not be obfuscated
             if self.tls is not None and not resp_header.flags & TAC_PLUS_UNENCRYPTED_FLAG:
+                logger.error('obfuscated reply over TLS from %s:%s', self.host, self.port)
                 raise TACACSProtocolError('obfuscated reply over TLS')
 
             # read the number of bytes specified in the response header
