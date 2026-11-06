@@ -10,7 +10,7 @@ This is the tacacs_plus API documentation. It contains the documentation extract
 :mod:`tacacs_plus.client` module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-source: https://github.com/ansible/tacacs_plus/blob/master/tacacs_plus/client.py
+source: https://github.com/durd/tacacs_plus/blob/main/tacacs_plus/client.py
 
 .. autoclass:: tacacs_plus.client.TACACSClient
    :members:
@@ -21,7 +21,7 @@ source: https://github.com/ansible/tacacs_plus/blob/master/tacacs_plus/client.py
 :mod:`tacacs_plus.packet` module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-source: https://github.com/ansible/tacacs_plus/blob/master/tacacs_plus/packet.py
+source: https://github.com/durd/tacacs_plus/blob/main/tacacs_plus/packet.py
 
 .. autoclass:: tacacs_plus.client.TACACSHeader
    :members:
@@ -36,7 +36,7 @@ source: https://github.com/ansible/tacacs_plus/blob/master/tacacs_plus/packet.py
 :mod:`tacacs_plus.authentication` module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-source: https://github.com/ansible/tacacs_plus/blob/master/tacacs_plus/authentication.py
+source: https://github.com/durd/tacacs_plus/blob/main/tacacs_plus/authentication.py
 
 .. autoclass:: tacacs_plus.authentication.TACACSAuthenticationStart
    :members:
@@ -56,7 +56,7 @@ source: https://github.com/ansible/tacacs_plus/blob/master/tacacs_plus/authentic
 :mod:`tacacs_plus.authorization` module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-source: https://github.com/ansible/tacacs_plus/blob/master/tacacs_plus/authorization.py
+source: https://github.com/durd/tacacs_plus/blob/main/tacacs_plus/authorization.py
 
 .. autoclass:: tacacs_plus.authorization.TACACSAuthorizationStart
    :members:
@@ -71,7 +71,7 @@ source: https://github.com/ansible/tacacs_plus/blob/master/tacacs_plus/authoriza
 :mod:`tacacs_plus.accounting` module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-source: https://github.com/ansible/tacacs_plus/blob/master/tacacs_plus/accounting.py
+source: https://github.com/durd/tacacs_plus/blob/main/tacacs_plus/accounting.py
 
 .. autoclass:: tacacs_plus.accounting.TACACSAccountingStart
    :members:
@@ -86,6 +86,6 @@ source: https://github.com/ansible/tacacs_plus/blob/master/tacacs_plus/accountin
 :mod:`tacacs_plus.flags` module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-source: https://github.com/ansible/tacacs_plus/blob/master/tacacs_plus/flags.py
+source: https://github.com/durd/tacacs_plus/blob/main/tacacs_plus/flags.py
 
 this module contains all the constant flags used to implement the tacacs+ RFC.
