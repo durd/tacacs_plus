@@ -126,6 +126,15 @@ class TACACSAuthenticationContinue:
 
 
 class TACACSAuthenticationReply:
+    """
+    An authentication REPLY from the server.
+
+    `status` is one of the TAC_PLUS_AUTHEN_STATUS_* values; `valid`,
+    `invalid`, `error`, `getuser`, `getpass` and `getdata` test for them.
+    `server_msg` is the server's message or prompt as bytes, `noecho` tells
+    whether the answer to a prompt should be hidden, and `aborted` is set
+    when the client ended the session instead of answering this reply.
+    """
 
     def __init__(self, status, flags, server_msg, data):
         self.status = status

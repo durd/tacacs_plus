@@ -190,3 +190,23 @@ password).  `encoding` (default `latin-1`, as before) is used for the
 username and passwords.  Pass `prompt=callable(server_msg, echo)` to ask a
 user for answers the client doesn't have; `tacacs_client` does that.
 
+
+### Development
+
+```
+$ pip install -e . pytest pytest-cov pytest-asyncio ruff
+$ pytest
+$ ruff check . bin/tacacs_client tacacs_client
+```
+
+`tests/tacacs_server.py` is a small TACACS+ server written from RFC 8907 (PAP,
+CHAP, the ASCII login dialog and change password, an expired-password user).
+`tests/test_rfc_server.py` runs the client against it over TCP.  It shows that
+the client speaks the protocol, not how a particular server such as Cisco ISE
+behaves: its prompts are guesses.  You can also start it by hand to try
+`tacacs_client`:
+
+```
+$ python -c "import time; from tests.tacacs_server import TacacsServer; \
+    s = TacacsServer('key', {'alice': 'secret'}); print(s.port); time.sleep(3600)"
+```
