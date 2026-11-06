@@ -1,5 +1,7 @@
 # TACACS+ Python client
 
+**Documentation, with examples for everything:** https://durd.github.io/tacacs_plus/
+
 A maintained fork of [ansible/tacacs_plus](https://github.com/ansible/tacacs_plus),
 which is archived.  Version 3.0.0 adds a non-interactive ASCII login and
 password change (see below); the library no longer reads from the terminal.
@@ -241,8 +243,10 @@ $ pytest
 $ ruff check .
 ```
 
-The API reference is built from the docstrings with Sphinx (`docs/`); CI builds
-it for every PR and keeps the HTML as the `docs-html` artifact:
+The documentation (usage examples and the API reference from the docstrings)
+is built with Sphinx from `docs/`. CI builds it for every PR and keeps the HTML
+as the `docs-html` artifact; each release tag publishes it to
+https://durd.github.io/tacacs_plus/ (`.github/workflows/pages.yml`). To build it locally:
 
 ```
 $ pip install -r docs/requirements.txt

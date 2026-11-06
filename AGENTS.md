@@ -50,7 +50,8 @@ in and changes passwords with this library.
   (e.g. the library no longer prompting) is a major version. To release, bump the
   version in a PR, then push a tag `v<version>` on `main`;
   `.github/workflows/release.yml` checks the tag matches, runs the tests and publishes
-  the wheel and sdist as a GitHub release.
+  the wheel and sdist as a GitHub release; `.github/workflows/pages.yml` publishes the
+  docs to https://durd.github.io/tacacs_plus/ for the same tag.
 
 ## Gotchas
 
