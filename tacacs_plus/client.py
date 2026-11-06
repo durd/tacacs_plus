@@ -32,6 +32,16 @@ class TACACSClient:
     A TACACS+ client for authentication, authorization and accounting.
     https://www.rfc-editor.org/rfc/rfc8907
 
+    Example::
+
+        from tacacs_plus.client import TACACSClient
+
+        cli = TACACSClient('tacacs.example.com', 49, 'shared-secret')
+        reply = cli.authenticate('alice', 'password')
+        print(reply.valid)      # True if the password is right
+
+    Every call opens its own connection, so one client can be reused.
+
     An open source TACACS+ server daemon is available at
     http://www.shrubbery.net/tac_plus/
     """
@@ -224,6 +234,14 @@ class TACACSClient:
         session and returns the unanswered reply with `reply.aborted` set, so
         the caller can collect the answer (e.g. a new password) and retry.
 
+        Example::
+
+            reply = cli.authenticate('alice', 'password')
+            if reply.aborted and reply.getdata:     # e.g. the password expired
+                print(reply.server_msg.decode())    # "Enter new password: "
+                reply = cli.authenticate('alice', 'password', new_password='N3w-pw')
+            print(reply.human_status)               # 'PASS', 'FAIL', ...
+
         :param username:
         :param password:       the user's (current) password
         :param priv_lvl:       privilege level the user asks for, 0-15
@@ -280,6 +298,12 @@ class TACACSClient:
 
         The server asks for the old and the new password (usually twice) in a
         GETPASS/GETDATA dialog, answered like in `authenticate`.
+
+        Example::
+
+            reply = cli.change_password('alice', 'old-password', 'N3w-password')
+            if not reply.valid:
+                print(reply.server_msg.decode('utf-8', 'replace'))   # the reason
 
         :param username:
         :param old_password:
@@ -355,6 +379,12 @@ class TACACSClient:
         """
         Authorize with a TACACS+ server.
 
+        Example::
+
+            reply = cli.authorize('alice', arguments=[b'service=shell', b'cmd='])
+            if reply.valid:
+                print(reply.arguments)      # e.g. [b'priv-lvl=15']
+
         :param username:
         :param arguments:      AV pairs as bytes, e.g. [b'service=shell',
                                b'cmd=show', b'cmd-arg=version']
@@ -398,6 +428,14 @@ class TACACSClient:
                 rem_addr=TAC_PLUS_VIRTUAL_REM_ADDR, port=TAC_PLUS_VIRTUAL_PORT):
         """
         Account with a TACACS+ server.
+
+        Example::
+
+            from tacacs_plus.flags import TAC_PLUS_ACCT_FLAG_START, TAC_PLUS_ACCT_FLAG_STOP
+
+            args = [b'task_id=42', b'service=shell', b'cmd=show version']
+            cli.account('alice', TAC_PLUS_ACCT_FLAG_START, arguments=args)
+            cli.account('alice', TAC_PLUS_ACCT_FLAG_STOP, arguments=args)
 
         :param username:
         :param flags:          TAC_PLUS_ACCT_FLAG_START,

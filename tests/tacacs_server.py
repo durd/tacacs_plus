@@ -1,6 +1,8 @@
 """Minimal TACACS+ server for tests, written from RFC 8907 (not from the client library).
 
-One authentication session per connection: PAP or CHAP (single START), or the ASCII
+One session per connection. Authorization answers each user's AV pairs from
+`authorizations` (FAIL for others), accounting records requests in `accounting` and
+answers SUCCESS. Authentication: PAP or CHAP (single START), or the ASCII
 dialog (GETUSER/GETPASS/GETDATA) for login and change password (CHPASS). Users in
 `error_users` get ERROR with PAP/CHAP and, with ASCII, "change password at next login"
 prompts. Records what the client sent.
@@ -20,7 +22,8 @@ import socket
 import struct
 import threading
 
-AUTHEN = 0x01
+AUTHEN, AUTHOR, ACCT = 0x01, 0x02, 0x03
+AUTHOR_PASS_ADD, AUTHOR_FAIL, ACCT_SUCCESS = 0x01, 0x10, 0x01
 LOGIN, CHPASS = 0x01, 0x02
 ASCII, PAP, CHAP = 0x01, 0x02, 0x03
 PASS, FAIL, GETDATA, GETUSER, GETPASS, ERROR = 0x01, 0x02, 0x03, 0x04, 0x05, 0x07
@@ -52,7 +55,8 @@ def _recv(conn, size):
 
 
 class TacacsServer:
-    def __init__(self, secret, passwords, error_users=(), chpass=True, encoding='latin-1', tls=None):
+    def __init__(self, secret, passwords, error_users=(), chpass=True, encoding='latin-1', tls=None,
+                 authorizations=None):
         self.key = secret.encode() if secret else b''
         self.tls = tls                      # server-side ssl.SSLContext, or None
         self.chpass = chpass                # False: answer CHPASS with ERROR
@@ -60,6 +64,8 @@ class TacacsServer:
         self.passwords = passwords          # user -> password
         self.error_users = set(error_users)  # answered with ERROR (like ISE's "change at next login")
         self.requests = []                  # dicts with what each START contained
+        self.authorizations = authorizations or {}  # user -> AV pairs (bytes) to answer with
+        self.accounting = []                # dicts with each accounting request
         self.sock = socket.socket()
         self.sock.bind(('127.0.0.1', 0))
         self.sock.listen()
@@ -91,9 +97,11 @@ class TacacsServer:
         return (version, ptype, seq_no, flags, session_id), body
 
     def _reply(self, conn, head, status, msg='', flags=0):
-        version, ptype, seq_no, header_flags, session_id = head
         msg = msg.encode()
-        reply = struct.pack('!BBHH', status, flags, len(msg), 0) + msg
+        self._send(conn, head, struct.pack('!BBHH', status, flags, len(msg), 0) + msg)
+
+    def _send(self, conn, head, reply):
+        version, ptype, seq_no, header_flags, session_id = head
         reply_seq = seq_no + 1
         header = struct.pack('!BBBB4sI', version, ptype, reply_seq, header_flags, session_id, len(reply))
         if not header_flags & UNENCRYPTED:
@@ -110,6 +118,10 @@ class TacacsServer:
 
     def _handle(self, conn):
         self._head, body = self._read(conn)
+        if self._head[1] == AUTHOR:
+            return self._author(conn, body)
+        if self._head[1] == ACCT:
+            return self._acct(conn, body)
         action, priv_lvl, authen_type, service, user_len, port_len, addr_len, data_len = body[:8]
         rest = body[8:]
         user = rest[:user_len].decode(self.encoding)
@@ -161,6 +173,32 @@ class TacacsServer:
         self.passwords[user] = new.decode(self.encoding)
         self.error_users.discard(user)
         return (PASS, 'Password changed')
+
+    def _start_fields(self, body, fixed):
+        """User and AV pairs of an authorization or accounting START (`fixed` header bytes)."""
+        user_len, port_len, addr_len, arg_cnt = body[fixed - 4:fixed]
+        pos = fixed + arg_cnt
+        user = body[pos:pos + user_len].decode(self.encoding)
+        pos += user_len + port_len + addr_len
+        arguments = []
+        for arg_len in body[fixed:fixed + arg_cnt]:
+            arguments.append(body[pos:pos + arg_len])
+            pos += arg_len
+        return user, arguments
+
+    def _author(self, conn, body):
+        user, arguments = self._start_fields(body, 8)
+        self.requests.append({'type': AUTHOR, 'user': user, 'priv_lvl': body[1], 'arguments': arguments})
+        answer = self.authorizations.get(user)
+        status = AUTHOR_FAIL if answer is None else AUTHOR_PASS_ADD
+        answer = answer or []
+        reply = struct.pack('!BBHH', status, len(answer), 0, 0) + bytes(len(a) for a in answer) + b''.join(answer)
+        self._send(conn, self._head, reply)
+
+    def _acct(self, conn, body):
+        user, arguments = self._start_fields(body, 9)
+        self.accounting.append({'user': user, 'flags': body[0], 'arguments': arguments})
+        self._send(conn, self._head, struct.pack('!HHB', 0, 0, ACCT_SUCCESS))
 
     def close(self):
         self.sock.close()
