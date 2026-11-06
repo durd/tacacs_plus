@@ -80,7 +80,7 @@ class AuthenDialog:
     Each reply is answered with the username, the (old) password or the new
     password, see prompt_kind(); each kind at most ANSWER_LIMITS times, and
     at most `max_steps` answers in all.  The clients run it like this, and
-    abort the session when there is no answer:
+    abort the session when there is no answer::
 
         while dialog.asks(reply):
             kind, answer = dialog.known_answer(reply)

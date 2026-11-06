@@ -10,7 +10,7 @@ in and changes passwords with this library.
 ## Rules
 
 - Work on a feature branch and open a PR against `main`; never commit to `main`
-  directly. CI (pytest on Python 3.10-3.15, ruff, wheel build) must pass before merging;
+  directly. CI (pytest on Python 3.10-3.15, ruff, wheel build, docs build) must pass before merging;
   branch protection enforces both, for admins too. If you rename a CI job or change the
   Python matrix, update the required checks in the branch protection to match, or PRs
   can't be merged.
@@ -21,6 +21,11 @@ in and changes passwords with this library.
   packet classes' `__str__` goes into the debug log, so mask anything secret there
   (see `TACACSAuthenticationContinue` and `TACACSAuthenticationStart._data_for_log`)
   and check new log lines.
+- Docstrings are the API reference: `docs/api.rst` pulls them in with Sphinx autodoc,
+  and CI builds it with `-W`, so broken reST markup fails the PR. Use reST field lists
+  (`:param x:`, `:return:`, `:raises:`), `::` before an indented code block, and
+  document constructor arguments in `__init__` (`autoclass_content = 'both'`). A new
+  public module or class needs an entry in `docs/api.rst`.
 - Logging calls pass their arguments (`logger.debug('sent <%s>', body)`), never
   f-strings or `%`/`.format()`; ruff's `G` rules check this. Everywhere else, use f-strings.
 - Every session (one TCP connection) starts with `_new_session()`: a new session_id from
@@ -34,8 +39,9 @@ in and changes passwords with this library.
   dialog logic with a scripted socket (`tests/test_authen_dialog.py`).
 - Don't run tests or the CLI against a production ISE or TACACS+ server: the change
   password calls change real passwords.
-- Dev tools are pinned in `requirements-dev.txt` (CI, tox and the release use it);
-  Dependabot updates them and the GitHub Actions versions weekly.
+- Dev tools are pinned in `requirements-dev.txt` (CI, tox and the release use it), the
+  docs tools in `docs/requirements.txt`; Dependabot updates them and the GitHub Actions
+  versions weekly.
 - No runtime dependencies (standard library only) and Python 3.10+. Keep it that way;
   the production server installs the wheel without internet.
 - Versioning is semantic, in `setup.py`. A change in behavior that callers can notice
