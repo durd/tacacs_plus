@@ -65,7 +65,9 @@ in and changes passwords with this library.
   (`pip wheel --no-deps .`).
 - **The test server is not ISE.** Its prompts ("Password: ", "Enter new password: ",
   "Confirm new password: ") are the same guesses the client makes, so passing tests
-  show the client speaks the protocol, not that it works with ISE. How prompts are
+  show the client speaks the protocol, not that it works with ISE. ISE's real prompts
+  are replayed in `tests/test_authen_dialog.py` (`test_ise_*`); keep those passing when
+  changing prompt matching. How prompts are
   recognized is in `tacacs_plus/authen_dialog.py` (`prompt_kind`, the regexes and
   `ANSWER_LIMITS`).
 - **After an abort the server sends nothing.** The client sends CONTINUE with
@@ -106,9 +108,11 @@ in and changes passwords with this library.
 
 Not yet fixed; don't assume otherwise.
 
-- Unverified against ISE 3.4p7: its prompt texts and order, and whether it supports
-  CHPASS. (Known: ISE compares passwords as UTF-8; ise-cpp passes `encoding='utf-8'`.) A probe (`tools/tacacs_probe.py` on ise-cpp's
-  `tools/tacacs-probe` branch) still has to be run.
+- ISE 3.4p7 was probed with ise-cpp's `tools/tacacs_probe.py` (its own protocol code,
+  no TLS): CHAP, ASCII login, the expired-password dialog and CHPASS all work, passwords
+  are compared as UTF-8, and the prompts (replayed in `tests/test_authen_dialog.py`,
+  `test_ise_*`) match `authen_dialog.py`. Not yet run against ISE: this library's
+  `change_password()`/`new_password`, and any password change over TLS.
 - TACACS+ over TLS against ISE: only an ASCII login (CLI, TLS 1.3) has been tried, and it
   passed. ISE requires a client certificate whose subjectAltName has the client's source
   IP (see the "Cisco ISE" section of `docs/guide/tls.rst`). Without TLS, obfuscation is

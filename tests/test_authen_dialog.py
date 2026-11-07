@@ -242,6 +242,47 @@ def test_change_password(client):
     assert answers(c) == [b'old', b'new', b'new']
 
 
+# The dialogs Cisco ISE 3.4p7 sent to ise-cpp's probe (tools/tacacs_probe.py),
+# with its exact statuses and prompts.
+
+def test_ise_expired_password(client):
+    c = client(reply(TAC_PLUS_AUTHEN_STATUS_GETPASS, 'Password:', NOECHO),
+               reply(TAC_PLUS_AUTHEN_STATUS_GETDATA, 'Enter New Password:', NOECHO),
+               reply(TAC_PLUS_AUTHEN_STATUS_GETDATA, 'Enter New Password Confirmation:', NOECHO),
+               reply(TAC_PLUS_AUTHEN_STATUS_PASS))
+    r = c.authenticate('user', 'old', new_password='new')
+    assert r.valid
+    assert answers(c) == [b'old', b'new', b'new']
+
+
+def test_ise_expired_password_without_new_password_aborts(client):
+    """ISE closes the connection after the abort; the client doesn't wait for a reply."""
+    c = client(reply(TAC_PLUS_AUTHEN_STATUS_GETPASS, 'Password:', NOECHO),
+               reply(TAC_PLUS_AUTHEN_STATUS_GETDATA, 'Enter New Password:', NOECHO))
+    r = c.authenticate('user', 'old')
+    assert r.aborted and r.getdata and r.server_msg == b'Enter New Password:'
+
+
+def test_ise_new_password_too_weak(client):
+    c = client(reply(TAC_PLUS_AUTHEN_STATUS_GETPASS, 'Password:', NOECHO),
+               reply(TAC_PLUS_AUTHEN_STATUS_GETDATA, 'Enter New Password:', NOECHO),
+               reply(TAC_PLUS_AUTHEN_STATUS_GETDATA, 'Enter New Password Confirmation:', NOECHO),
+               reply(TAC_PLUS_AUTHEN_STATUS_FAIL, 'Password complexity does not meet'))
+    r = c.authenticate('user', 'old', new_password='weak')
+    assert r.invalid and r.server_msg == b'Password complexity does not meet'
+
+
+def test_ise_change_password(client):
+    c = client(reply(TAC_PLUS_AUTHEN_STATUS_GETDATA, 'Enter Old Password:', NOECHO),
+               reply(TAC_PLUS_AUTHEN_STATUS_GETDATA, 'Enter New Password:', NOECHO),
+               reply(TAC_PLUS_AUTHEN_STATUS_GETDATA, 'Enter New Password Confirmation:', NOECHO),
+               reply(TAC_PLUS_AUTHEN_STATUS_PASS))
+    r = c.change_password('user', 'old', 'new')
+    assert r.valid
+    assert c.script.sent()[0][0] == TAC_PLUS_AUTHEN_CHPASS
+    assert answers(c) == [b'old', b'new', b'new']
+
+
 def test_login_start_action(client):
     c = client(reply(TAC_PLUS_AUTHEN_STATUS_PASS))
     c.authenticate('user', 'secret')

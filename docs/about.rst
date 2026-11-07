@@ -53,9 +53,23 @@ tests are:
 - **TLS tests** against that server, with a test CA and server and client
   certificates made for each run: TLS 1.3, client certificates, an unknown CA, a
   wrong server name, a server that only offers TLS 1.2, and an obfuscated reply.
-- **Cisco ISE 3.4:** a CHAP login (by ise-cpp, which showed that ISE compares
-  passwords as UTF-8: pass ``encoding='utf-8'``), and an ASCII login over TLS 1.3
-  with a client certificate, using the command-line client (see :ref:`tls-ise`).
+- **Cisco ISE 3.4 (patch 7):**
+
+  - without TLS, with ise-cpp's probe (a separate implementation of the same
+    protocol): CHAP and ASCII logins, an expired password changed in the login
+    dialog, and a voluntary password change (CHPASS).  ISE compares passwords as
+    UTF-8 (pass ``encoding='utf-8'``), and a new password its policy refuses
+    comes back as ``FAIL`` with ``server_msg`` "Password complexity does not
+    meet".  Its prompts, which this client recognises (replayed in
+    ``tests/test_authen_dialog.py``):
+
+    - login: ``Password:``, and for an expired password then
+      ``Enter New Password:`` and ``Enter New Password Confirmation:``;
+    - CHPASS: ``Enter Old Password:``, ``Enter New Password:``,
+      ``Enter New Password Confirmation:``.
+
+  - with TLS 1.3 and a client certificate: an ASCII login with this library's
+    command-line client (see :ref:`tls-ise`).
 - Every example in this documentation has been run against the test server.
 
 Development is done on macOS.
@@ -63,12 +77,9 @@ Development is done on macOS.
 What isn't tested
 -----------------
 
-- **Cisco ISE, beyond logging in.**  Version 3 was written for ISE 3.4; only
-  logins have been tried against it (see above).  Not yet known:
-
-  - the exact prompts ISE sends in the login and password-change dialogs (the
-    client recognises prompts by their text, see below);
-  - whether ISE supports a voluntary password change (``change_password()``).
+- **This library's password change against ISE.**  ISE's password-change
+  dialogs were tried with ise-cpp's probe, not with ``change_password()`` or
+  ``new_password``, and not over TLS.
 
 - **Other servers.**  Version 2 was used with the free
   `tac_plus <http://www.shrubbery.net/tac_plus/>`_ server; version 3 hasn't been
