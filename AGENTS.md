@@ -109,9 +109,10 @@ Not yet fixed; don't assume otherwise.
 - Unverified against ISE 3.4p7: its prompt texts and order, whether it supports CHPASS,
   and whether it expects UTF-8 or Latin-1. A probe (`tools/tacacs_probe.py` on ise-cpp's
   `tools/tacacs-probe` branch) still has to be run.
-- TACACS+ over TLS is tested only against the test server, not ISE: ISE supports it
-  but it isn't enabled yet (it needs TLS 1.3 turned on in ISE first). Without TLS,
-  obfuscation is MD5-based (RFC 8907 says to use TACACS+ only on secure networks).
+- TACACS+ over TLS against ISE: only an ASCII login (CLI, TLS 1.3) has been tried, and it
+  passed. ISE requires a client certificate whose subjectAltName has the client's source
+  IP (see the "Cisco ISE" section of `docs/guide/tls.rst`). Without TLS, obfuscation is
+  MD5-based (RFC 8907 says to use TACACS+ only on secure networks).
 - Single-connection mode (`TAC_PLUS_SINGLE_CONNECT_FLAG`) is left out on purpose: ise-cpp
   makes a few requests a minute, so one connection per session costs nothing, while
   reusing connections needs open-connection handling, reconnects and thread safety.

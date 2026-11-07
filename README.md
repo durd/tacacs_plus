@@ -31,14 +31,17 @@ More detail on the [About](https://durd.github.io/tacacs_plus/about.html) page.
 - TLS against that server, with certificates made for each run: TLS 1.3, client
   certificates, an unknown CA, a wrong server name, a TLS 1.2-only server.
 
+TLS has also been tried against Cisco ISE 3.4: an ASCII login with a client
+certificate. ISE wants a client certificate with the client's IP in its
+subjectAltName; see [Cisco ISE](https://durd.github.io/tacacs_plus/guide/tls.html#cisco-ise).
+
 Every example in the documentation has been run against the test server.
 
 **Not tested yet:**
 
-- **Cisco ISE.** Version 3 was written for ISE 3.4 but hasn't been tested
-  against it: its prompt texts, whether it supports a voluntary password change,
-  and which encoding it expects for non-ASCII passwords are unknown.
-- **TLS against a real server.** Only tested against the test server.
+- **Cisco ISE, beyond a TLS login.** Its prompt texts, whether it supports a
+  voluntary password change, and which encoding it expects for non-ASCII
+  passwords are unknown.
 - **Other servers.** Version 2 was used with the free
   [tac_plus](http://www.shrubbery.net/tac_plus/) server; version 3 hasn't been
   tested with tac_plus or any other server.

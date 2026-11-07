@@ -53,6 +53,8 @@ tests are:
 - **TLS tests** against that server, with a test CA and server and client
   certificates made for each run: TLS 1.3, client certificates, an unknown CA, a
   wrong server name, a server that only offers TLS 1.2, and an obfuscated reply.
+- **TLS against Cisco ISE 3.4:** an ASCII login over TLS 1.3 with a client
+  certificate, using the command-line client (see :ref:`tls-ise`).
 - Every example in this documentation has been run against the test server.
 
 Development is done on macOS.
@@ -60,17 +62,14 @@ Development is done on macOS.
 What isn't tested
 -----------------
 
-- **Cisco ISE.**  Version 3 was written for ISE 3.4, but hasn't been tested
-  against it yet.  In particular:
+- **Cisco ISE, beyond a TLS login.**  Version 3 was written for ISE 3.4; only an
+  ASCII login over TLS has been tried against it.  Not yet known:
 
   - the exact prompts ISE sends in the login and password-change dialogs (the
     client recognises prompts by their text, see below);
   - whether ISE supports a voluntary password change (``change_password()``);
   - which character encoding ISE expects for non-ASCII passwords.
 
-- **TLS against a real server.**  TLS is only tested against the test server.
-  ISE supports TACACS+ over TLS but needs TLS 1.3 enabled first; it hasn't been
-  tried yet.
 - **Other servers.**  Version 2 was used with the free
   `tac_plus <http://www.shrubbery.net/tac_plus/>`_ server; version 3 hasn't been
   tested against tac_plus or any other server.
