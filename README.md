@@ -31,14 +31,17 @@ More detail on the [About](https://durd.github.io/tacacs_plus/about.html) page.
 - TLS against that server, with certificates made for each run: TLS 1.3, client
   certificates, an unknown CA, a wrong server name, a TLS 1.2-only server.
 
+Against Cisco ISE 3.4p7, with ise-cpp's probe (same protocol, separate code): CHAP
+and ASCII logins, an expired password changed in the login dialog, and a voluntary
+change (CHPASS); ISE's prompts are ones this client recognises, and it compares
+passwords as UTF-8 (pass `encoding='utf-8'`). With this library's CLI, over TLS: an
+ASCII login, a voluntary password change, and an expired password changed at login. ISE wants a client certificate with the client's IP in its
+subjectAltName; see [Cisco ISE](https://durd.github.io/tacacs_plus/guide/tls.html#cisco-ise).
+
 Every example in the documentation has been run against the test server.
 
 **Not tested yet:**
 
-- **Cisco ISE.** Version 3 was written for ISE 3.4 but hasn't been tested
-  against it: its prompt texts, whether it supports a voluntary password change,
-  and which encoding it expects for non-ASCII passwords are unknown.
-- **TLS against a real server.** Only tested against the test server.
 - **Other servers.** Version 2 was used with the free
   [tac_plus](http://www.shrubbery.net/tac_plus/) server; version 3 hasn't been
   tested with tac_plus or any other server.
@@ -54,7 +57,7 @@ Every example in the documentation has been run against the test server.
   CRLs you load, no OCSP.
 - Login prompts are recognised by English words ("new", "confirm", "old", ...)
   or by their order.
-- Passwords are sent as Latin-1 unless you pass `encoding`.
+- Passwords are sent as Latin-1 unless you pass `encoding` (ISE wants `'utf-8'`).
 - One session per connection: each call opens and closes its own connection.
   RFC 8907's single-connection mode, which reuses one connection for many
   sessions, isn't implemented; it only matters for clients sending many

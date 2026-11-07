@@ -53,6 +53,27 @@ tests are:
 - **TLS tests** against that server, with a test CA and server and client
   certificates made for each run: TLS 1.3, client certificates, an unknown CA, a
   wrong server name, a server that only offers TLS 1.2, and an obfuscated reply.
+- **Cisco ISE 3.4 (patch 7):**
+
+  - without TLS, with ise-cpp's probe (a separate implementation of the same
+    protocol): CHAP and ASCII logins, an expired password changed in the login
+    dialog, and a voluntary password change (CHPASS).  ISE compares passwords as
+    UTF-8 (pass ``encoding='utf-8'``), and a new password its policy refuses
+    comes back as ``FAIL`` with ``server_msg`` "Password complexity does not
+    meet".  Its prompts, which this client recognises (replayed in
+    ``tests/test_authen_dialog.py``):
+
+    - login: ``Password:``, and for an expired password then
+      ``Enter New Password:`` and ``Enter New Password Confirmation:``;
+    - CHPASS: ``Enter Old Password:``, ``Enter New Password:``,
+      ``Enter New Password Confirmation:``.
+
+  - with TLS 1.3 and a client certificate, using this library's command-line
+    client: an ASCII login, a voluntary password change
+    (``change_password()``, CHPASS), and an expired password changed in the login
+    dialog (see :ref:`tls-ise`).  The command-line client answers the dialog
+    through the ``prompt`` callback; ``new_password=`` gives the same answers
+    without one.
 - Every example in this documentation has been run against the test server.
 
 Development is done on macOS.
@@ -60,17 +81,7 @@ Development is done on macOS.
 What isn't tested
 -----------------
 
-- **Cisco ISE.**  Version 3 was written for ISE 3.4, but hasn't been tested
-  against it yet.  In particular:
 
-  - the exact prompts ISE sends in the login and password-change dialogs (the
-    client recognises prompts by their text, see below);
-  - whether ISE supports a voluntary password change (``change_password()``);
-  - which character encoding ISE expects for non-ASCII passwords.
-
-- **TLS against a real server.**  TLS is only tested against the test server.
-  ISE supports TACACS+ over TLS but needs TLS 1.3 enabled first; it hasn't been
-  tried yet.
 - **Other servers.**  Version 2 was used with the free
   `tac_plus <http://www.shrubbery.net/tac_plus/>`_ server; version 3 hasn't been
   tested against tac_plus or any other server.
@@ -97,7 +108,7 @@ Limitations
   the order decides.  A server with other wording or another language may need
   changes in :mod:`tacacs_plus.authen_dialog`.
 - **Passwords are sent as Latin-1** unless you pass ``encoding``; it must match
-  what the server expects.
+  what the server expects (Cisco ISE: ``'utf-8'``).
 - **One session per connection.**  Each call opens a new TCP (or TLS) connection,
   runs one session and closes it.  RFC 8907's single-connection mode
   (``TAC_PLUS_SINGLE_CONNECT_FLAG``) would let later sessions reuse the
