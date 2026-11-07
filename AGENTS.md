@@ -106,8 +106,8 @@ in and changes passwords with this library.
 
 Not yet fixed; don't assume otherwise.
 
-- Unverified against ISE 3.4p7: its prompt texts and order, whether it supports CHPASS,
-  and whether it expects UTF-8 or Latin-1. A probe (`tools/tacacs_probe.py` on ise-cpp's
+- Unverified against ISE 3.4p7: its prompt texts and order, and whether it supports
+  CHPASS. (Known: ISE compares passwords as UTF-8; ise-cpp passes `encoding='utf-8'`.) A probe (`tools/tacacs_probe.py` on ise-cpp's
   `tools/tacacs-probe` branch) still has to be run.
 - TACACS+ over TLS against ISE: only an ASCII login (CLI, TLS 1.3) has been tried, and it
   passed. ISE requires a client certificate whose subjectAltName has the client's source
