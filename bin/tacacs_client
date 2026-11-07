@@ -36,7 +36,7 @@ def parse_args():
     )
     parser.add_argument('-u', '--username', required=True, help="user name")
     parser.add_argument('-H', '--host', required=True, help="tacacs+ server address")
-    parser.add_argument('-p', '--port', type=int, default=49, help="tacacs+ server port (default 49)")
+    parser.add_argument('-p', '--port', type=int, help="tacacs+ server port (default 49, or 6049 with TLS)")
     parser.add_argument('-l', '--priv-lvl', type=int, default=TAC_PLUS_PRIV_LVL_MIN, help="user privilege level")
     parser.add_argument('-t', '--authen-type', choices=TAC_PLUS_AUTHEN_TYPES, default='ascii',
                         help="authentication type")

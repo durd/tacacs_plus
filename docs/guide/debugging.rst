@@ -34,6 +34,6 @@ and passwords when they aren't given (or set ``TACACS_PLUS_KEY`` and
    $ tacacs_client -H tacacs.example.com -u alice -v change-password
    $ tacacs_client -H tacacs.example.com -u alice -v authorize -c service=shell cmd=
    $ tacacs_client -H tacacs.example.com -u alice account -f start -c task_id=1 service=shell
-   $ tacacs_client -H tacacs.example.com -p 300 --tls-ca tacacs-ca.pem -u alice -v authenticate
+   $ tacacs_client -H tacacs.example.com --tls-ca tacacs-ca.pem -u alice -v authenticate
 
 ``-v`` prints the reply; ``tacacs_client -h`` lists all options.

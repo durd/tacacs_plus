@@ -4,9 +4,25 @@ TACACS+ over TLS (RFC 9887).
 Pass an ssl.SSLContext as `tls` to either client, and `secret=None`: with TLS,
 packet bodies must not be obfuscated (the TAC_PLUS_UNENCRYPTED_FLAG is set
 instead), and TLS 1.3 or newer is required.  tls_context() builds a suitable
-context.  RFC 9887 registers TCP port 300 ("tacacss") for it.
+context.  With `port=None` the clients connect to TLS_PORT, 6049, the port
+Cisco ISE uses by default; RFC 9887 registers TCP port 300 ("tacacss"), which
+some servers use instead.
 """
 import ssl
+
+#: the port for TACACS+ without TLS (RFC 8907)
+PORT = 49
+#: the port for TACACS+ over TLS that Cisco ISE uses by default
+TLS_PORT = 6049
+
+
+def default_port(port, tls):
+    """
+    `port`, or if it is None, TLS_PORT with `tls` and PORT without.
+    """
+    if port is not None:
+        return port
+    return TLS_PORT if tls is not None else PORT
 
 
 def tls_context(cafile=None, capath=None, cadata=None, certfile=None,
@@ -21,7 +37,7 @@ def tls_context(cafile=None, capath=None, cadata=None, certfile=None,
         from tacacs_plus.tls import tls_context
 
         tls = tls_context(cafile='tacacs-ca.pem')
-        cli = TACACSClient('tacacs.example.com', 300, None, tls=tls)
+        cli = TACACSClient('tacacs.example.com', 6049, None, tls=tls)
         reply = cli.authenticate('alice', 'password')
 
     RFC 9887 also asks for revocation checking, which Python's ssl module

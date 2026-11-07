@@ -82,7 +82,8 @@ in and changes passwords with this library.
   too. ise-cpp uses the sync one.
 - **TLS (`tacacs_plus/tls.py`, RFC 9887):** with `tls`, `secret` must be None, packets
   carry `TAC_PLUS_UNENCRYPTED_FLAG` and aren't obfuscated, and a reply without the flag
-  is a `TACACSProtocolError`. `check_tls()` refuses contexts that allow TLS < 1.3 or
+  is a `TACACSProtocolError`. `port=None` means `default_port()`: 49, or 6049 with TLS
+  (ISE's default, not RFC 9887's 300; ise-cpp relies on it). `check_tls()` refuses contexts that allow TLS < 1.3 or
   don't verify the server. In the sync client, check `sock.pending()` before
   `select()`: decrypted data can sit in the SSL buffer, where select doesn't see it.
   The TLS tests make their certificates with the `openssl` command
