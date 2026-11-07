@@ -69,8 +69,11 @@ tests are:
       ``Enter New Password Confirmation:``.
 
   - with TLS 1.3 and a client certificate, using this library's command-line
-    client: an ASCII login and a voluntary password change
-    (``change_password()``, CHPASS) (see :ref:`tls-ise`).
+    client: an ASCII login, a voluntary password change
+    (``change_password()``, CHPASS), and an expired password changed in the login
+    dialog (see :ref:`tls-ise`).  The command-line client answers the dialog
+    through the ``prompt`` callback; ``new_password=`` gives the same answers
+    without one.
 - Every example in this documentation has been run against the test server.
 
 Development is done on macOS.
@@ -78,9 +81,6 @@ Development is done on macOS.
 What isn't tested
 -----------------
 
-- **This library's expired-password change against ISE.**  ISE's
-  expired-password dialog was tried with ise-cpp's probe, not with
-  ``authenticate(..., new_password=...)``.
 
 - **Other servers.**  Version 2 was used with the free
   `tac_plus <http://www.shrubbery.net/tac_plus/>`_ server; version 3 hasn't been

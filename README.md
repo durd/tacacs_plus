@@ -35,15 +35,13 @@ Against Cisco ISE 3.4p7, with ise-cpp's probe (same protocol, separate code): CH
 and ASCII logins, an expired password changed in the login dialog, and a voluntary
 change (CHPASS); ISE's prompts are ones this client recognises, and it compares
 passwords as UTF-8 (pass `encoding='utf-8'`). With this library's CLI, over TLS: an
-ASCII login and a voluntary password change. ISE wants a client certificate with the client's IP in its
+ASCII login, a voluntary password change, and an expired password changed at login. ISE wants a client certificate with the client's IP in its
 subjectAltName; see [Cisco ISE](https://durd.github.io/tacacs_plus/guide/tls.html#cisco-ise).
 
 Every example in the documentation has been run against the test server.
 
 **Not tested yet:**
 
-- **This library's expired-password change against ISE** (only the probe has
-  done it).
 - **Other servers.** Version 2 was used with the free
   [tac_plus](http://www.shrubbery.net/tac_plus/) server; version 3 hasn't been
   tested with tac_plus or any other server.
