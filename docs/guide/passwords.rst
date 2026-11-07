@@ -78,6 +78,23 @@ support it (action ``CHPASS``); if it doesn't, ``reply.error`` is set.
          else:
              print('not changed:', reply.server_msg.decode('utf-8', 'replace'))
 
+FAIL after a change isn't always "not changed"
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Cisco ISE changes the password *before* it checks authorization.  If its policy
+then denies the user (e.g. a DenyAccess shell profile), the reply is ``FAIL``
+although the new password is already set.  This applies to
+``change_password()`` and to a login with ``new_password``.
+
+- A FAIL whose ``server_msg`` gives a password-policy reason (e.g. "Password
+  complexity does not meet") means the password wasn't changed.
+- A wrong current password is a FAIL too.  Check it first (a CHAP login sends
+  only a hash of it), so that a later FAIL without a reason can only come after
+  the change; then tell the user it may have gone through, rather than that
+  nothing changed.
+- On ISE, give the client's network device a policy set whose authorization
+  permits the user (privilege 1 is enough), so this doesn't happen.
+
 .. _pap-chap:
 
 PAP and CHAP

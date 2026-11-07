@@ -60,7 +60,9 @@ tests are:
     dialog, and a voluntary password change (CHPASS).  ISE compares passwords as
     UTF-8 (pass ``encoding='utf-8'``), and a new password its policy refuses
     comes back as ``FAIL`` with ``server_msg`` "Password complexity does not
-    meet".  Its prompts, which this client recognises (replayed in
+    meet".  ISE changes the password before it checks authorization, so a
+    denied user gets ``FAIL`` after a completed change (see
+    :doc:`guide/passwords`).  Its prompts, which this client recognises (replayed in
     ``tests/test_authen_dialog.py``):
 
     - login: ``Password:``, and for an expired password then
