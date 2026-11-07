@@ -70,7 +70,8 @@ what's wrong:
 Cisco ISE
 ---------
 
-An ASCII login over TLS has been tested against ISE 3.4.  ISE needs more than
+An ASCII login and a password change (``change_password()``) over TLS have been
+tested against ISE 3.4.  ISE needs more than
 the server side of TLS:
 
 - **A certificate for TACACS+.**  In ISE, a system certificate must have the

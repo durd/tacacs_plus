@@ -68,8 +68,9 @@ tests are:
     - CHPASS: ``Enter Old Password:``, ``Enter New Password:``,
       ``Enter New Password Confirmation:``.
 
-  - with TLS 1.3 and a client certificate: an ASCII login with this library's
-    command-line client (see :ref:`tls-ise`).
+  - with TLS 1.3 and a client certificate, using this library's command-line
+    client: an ASCII login and a voluntary password change
+    (``change_password()``, CHPASS) (see :ref:`tls-ise`).
 - Every example in this documentation has been run against the test server.
 
 Development is done on macOS.
@@ -77,9 +78,9 @@ Development is done on macOS.
 What isn't tested
 -----------------
 
-- **This library's password change against ISE.**  ISE's password-change
-  dialogs were tried with ise-cpp's probe, not with ``change_password()`` or
-  ``new_password``, and not over TLS.
+- **This library's expired-password change against ISE.**  ISE's
+  expired-password dialog was tried with ise-cpp's probe, not with
+  ``authenticate(..., new_password=...)``.
 
 - **Other servers.**  Version 2 was used with the free
   `tac_plus <http://www.shrubbery.net/tac_plus/>`_ server; version 3 hasn't been

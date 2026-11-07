@@ -111,9 +111,10 @@ Not yet fixed; don't assume otherwise.
 - ISE 3.4p7 was probed with ise-cpp's `tools/tacacs_probe.py` (its own protocol code,
   no TLS): CHAP, ASCII login, the expired-password dialog and CHPASS all work, passwords
   are compared as UTF-8, and the prompts (replayed in `tests/test_authen_dialog.py`,
-  `test_ise_*`) match `authen_dialog.py`. Not yet run against ISE: this library's
-  `change_password()`/`new_password`, and any password change over TLS.
-- TACACS+ over TLS against ISE: only an ASCII login (CLI, TLS 1.3) has been tried, and it
+  `test_ise_*`) match `authen_dialog.py`. Over TLS, this library's CLI did an
+  ASCII login and `change-password` (CHPASS) against ISE. Not yet run against ISE: this
+  library's `authenticate(..., new_password=...)` (the expired-password dialog).
+- TACACS+ over TLS against ISE: an ASCII login and a CHPASS password change (CLI, TLS 1.3)
   passed. ISE requires a client certificate whose subjectAltName has the client's source
   IP (see the "Cisco ISE" section of `docs/guide/tls.rst`). Without TLS, obfuscation is
   MD5-based (RFC 8907 says to use TACACS+ only on secure networks).
