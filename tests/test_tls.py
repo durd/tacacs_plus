@@ -153,6 +153,14 @@ def test_check_tls():
         TACACSClient('127.0.0.1', 49, None, tls=True)
 
 
+@pytest.mark.parametrize('cls', [TACACSClient, AsyncTACACSClient])
+def test_default_port(cls):
+    """port=None means 49, or 6049 (Cisco ISE's TLS port) with TLS."""
+    assert cls('127.0.0.1', None, 'secret').port == 49
+    assert cls('127.0.0.1', None, None, tls=tls_context()).port == 6049
+    assert cls('127.0.0.1', 300, None, tls=tls_context()).port == 300
+
+
 @pytest.mark.asyncio
 async def test_async_without_secret_sets_unencrypted_flag():
     """Without a secret the async client didn't set the flag, so servers de-obfuscated garbage."""

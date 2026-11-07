@@ -27,7 +27,7 @@ from .flags import (
 )
 from .authen_dialog import AuthenDialog, start_data
 from .exceptions import TACACSProtocolError
-from .tls import check_tls
+from .tls import check_tls, default_port
 from .packet import TACACSPacket, TACACSHeader
 from .authentication import (
     TACACSAuthenticationStart,
@@ -83,7 +83,8 @@ class TACACSClient:
     ):
         """
         :param host:        hostname or address of the TACACS+ server
-        :param port:        port of the TACACS+ server, generally 49
+        :param port:        port of the TACACS+ server; `None` for the default,
+                            49, or 6049 with `tls`
         :param secret:      the secret key used to obfuscate packet bodies; can
                             be None to disable packet body obfuscation, and
                             must be `None` with `tls`
@@ -96,12 +97,12 @@ class TACACSClient:
         :param version_min: TACACS+ minor version number, 0 or 1
         :param tls:         an ssl.SSLContext for TACACS+ over TLS (RFC 9887),
                             see tacacs_plus.tls.tls_context(); `port` is then
-                            the server's TLS port
+                            the server's TLS port (ISE: 6049, RFC 9887: 300)
         :param tls_server_name: the name the server's certificate must match
                             (and SNI); default `host`
         """
         self.host = host
-        self.port = port
+        self.port = default_port(port, tls)
         self.secret = secret
         self.timeout = timeout
         self.version_max = version_max

@@ -273,11 +273,12 @@ from tacacs_plus.tls import tls_context
 
 tls = tls_context(cafile='tacacs-ca.pem')     # the CA that signed the server's certificate
 # tls = tls_context(cafile=..., certfile='client.pem', keyfile='client.key')  # if the server wants a client certificate
-cli = TACACSClient('tacacs.example.com', 300, None, tls=tls)
+cli = TACACSClient('tacacs.example.com', 6049, None, tls=tls)
 authen = cli.authenticate('username', 'password')
 ```
 
-RFC 9887 registers port 300 for TACACS+ over TLS; check the server's configuration.  When `host` is an
+Cisco ISE uses port 6049 for TLS by default, and RFC 9887 registers port 300; pass
+`None` as the port for the default (6049 with TLS, 49 without).  When `host` is an
 IP address, the certificate must contain it, or pass `tls_server_name=` with
 the name it was issued for.  Certificate and handshake errors are
 `ssl.SSLError`s, which are `OSError`s.  The async client takes the same
