@@ -363,6 +363,42 @@ async def test_async_connection_closed_mid_packet():
         await AsyncTACACSClient._read_exactly(reader, 18)
 
 
+class ResettingWriter:
+    """A StreamWriter whose connection is reset while it closes."""
+
+    def __init__(self):
+        self.closed = False
+
+    def write(self, data):
+        pass
+
+    async def drain(self):
+        pass
+
+    def close(self):
+        self.closed = True
+
+    async def wait_closed(self):
+        raise ConnectionResetError(104, 'Connection reset by peer')
+
+
+@pytest.mark.asyncio
+async def test_async_reset_while_closing_keeps_the_result(monkeypatch):
+    """A server that resets the connection after its last reply (seen in CI
+    over TLS) made wait_closed() raise and authenticate() fail after a PASS."""
+    reader = asyncio.StreamReader()
+    reader.feed_data(reply(TAC_PLUS_AUTHEN_STATUS_PASS))
+    writer = ResettingWriter()
+
+    async def open_connection(*args, **kwargs):
+        return reader, writer
+
+    monkeypatch.setattr(asyncio, 'open_connection', open_connection)
+    c = AsyncTACACSClient('127.0.0.1', 49, None, session_id=SESSION_ID)
+    r = await c.authenticate('user', 'secret', authen_type=TAC_PLUS_AUTHEN_TYPE_PAP)
+    assert r.valid and writer.closed
+
+
 @pytest.mark.parametrize('authen_type', [TAC_PLUS_AUTHEN_TYPE_PAP, TAC_PLUS_AUTHEN_TYPE_CHAP])
 def test_start_str_masks_pap_and_chap_data(authen_type):
     start = TACACSAuthenticationStart('user', authen_type, data=b'hunter2')
