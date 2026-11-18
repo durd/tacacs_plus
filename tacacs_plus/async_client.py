@@ -150,7 +150,13 @@ class TACACSClient:
             yield reader, writer
         finally:
             writer.close()
-            await writer.wait_closed()
+            try:
+                await writer.wait_closed()
+            except OSError:
+                # The session is over (or already failed): a server that resets
+                # the connection during the TLS shutdown doesn't change the
+                # result, and the sync client's close() doesn't raise either.
+                pass
 
     async def send(self, body, req_type, seq_no=1, reader=None, writer=None,
                    expect_reply=True):
