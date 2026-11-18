@@ -47,16 +47,26 @@ in and changes passwords with this library.
 - Don't run tests or the CLI against a production ISE or TACACS+ server: the change
   password calls change real passwords.
 - Dev tools are pinned in `requirements-dev.txt` (CI, tox and the release use it), the
-  docs tools in `docs/requirements.txt`; Dependabot updates them and the GitHub Actions
-  versions weekly.
+  docs tools in `docs/requirements.txt`, the build backend (setuptools) in
+  `pyproject.toml`'s `[build-system] requires`; Dependabot updates them and the GitHub
+  Actions (pinned to commit SHAs) weekly. The setuptools pin is in the `dev-tools`
+  group: dependabot-core treats a `build-system.requires` as a PEP 621 dependency, but
+  that's from reading its code, so if a setuptools release goes by without a Dependabot
+  PR, bump the pin by hand. `pyproject.toml` has only `[build-system]`: the metadata
+  stays in `setup.py`.
 - No runtime dependencies (standard library only) and Python 3.10+. Keep it that way;
   the production server installs the wheel without internet.
 - Versioning is semantic, in `setup.py`. A change in behavior that callers can notice
   (e.g. the library no longer prompting) is a major version. To release, bump the
-  version in a PR, then push a tag `v<version>` on `main`;
-  `.github/workflows/release.yml` checks the tag matches, runs the tests and publishes
-  the wheel and sdist as a GitHub release; `.github/workflows/pages.yml` publishes the
-  docs to https://durd.github.io/tacacs_plus/ for the same tag.
+  version in a PR, then push a tag `v<version>` on `main`.
+  `.github/workflows/release.yml` has two jobs: `build` (read-only token) checks the tag
+  matches, runs the tests and builds the wheel and sdist; `publish` (the only job that
+  can write) downloads them, logs their sha256 and creates the GitHub release. Keep
+  `publish` free of checkout, pip and third-party actions: anything that runs there can
+  tamper with the wheel ise-cpp deploys. `.github/workflows/pages.yml` publishes the
+  docs to https://durd.github.io/tacacs_plus/ for the same tag; only its `deploy` job has
+  `pages: write`/`id-token: write`. Checkouts use `persist-credentials: false`, as
+  nothing in CI pushes.
 
 ## Gotchas
 
