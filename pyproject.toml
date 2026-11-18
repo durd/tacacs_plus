@@ -1,0 +1,7 @@
+# Only pins the build backend, so `python -m build` and `pip wheel` don't
+# fetch whatever setuptools is newest.  The metadata stays in setup.py (the
+# release workflow reads the version from there).  Dependabot updates the pin
+# with requirements-dev.txt.
+[build-system]
+requires = ["setuptools==84.2.1"]
+build-backend = "setuptools.build_meta"
